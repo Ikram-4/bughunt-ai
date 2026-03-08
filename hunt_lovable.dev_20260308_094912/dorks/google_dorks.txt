@@ -1,0 +1,124 @@
+# ====================================================================
+# BugHunter Pro — Google Dorks for: lovable.dev
+# Generated: 2026-03-08 10:38:16
+# Usage: Paste each into Google/Bing browser manually
+# ====================================================================
+
+# ===== SENSITIVE FILES =====
+site:lovable.dev ext:env | ext:log | ext:conf | ext:cnf | ext:ini | ext:sh | ext:bak | ext:backup
+site:lovable.dev ext:sql | ext:db | ext:sqlite | ext:dbf | ext:dump | ext:mdb
+site:lovable.dev ext:zip | ext:tar | ext:gz | ext:rar | ext:7z | ext:tgz
+site:lovable.dev ext:pem | ext:key | ext:crt | ext:csr | ext:der | ext:pfx | ext:p12
+site:lovable.dev filetype:log "error" | "exception" | "stack trace" | "password" | "token"
+site:lovable.dev filetype:txt "password" | "passwd" | "api_key" | "secret" | "token" | "credential"
+site:lovable.dev "index of" "/.git" | "/backup" | "/config" | "/private" | "/secret" | "/admin"
+site:lovable.dev ext:php.bak | ext:asp.bak | ext:aspx.bak | ext:conf.bak | ext:yml.bak
+site:lovable.dev ext:xml | ext:yaml | ext:yml | ext:toml | ext:properties intitle:"config"
+site:lovable.dev filetype:pdf intitle:"confidential" | intitle:"internal" | intitle:"restricted"
+site:lovable.dev "DB_PASSWORD" | "DB_USER" | "DATABASE_URL" | "MYSQL_ROOT_PASSWORD"
+site:lovable.dev "SECRET_KEY" | "SECRET_KEY_BASE" | "APP_SECRET" | "APP_KEY"
+site:lovable.dev intitle:"index of" intext:".env"
+
+# ===== ADMIN & CONTROL PANELS =====
+site:lovable.dev inurl:admin | inurl:administrator | inurl:wp-admin | inurl:panel | inurl:dashboard
+site:lovable.dev inurl:login | inurl:signin | inurl:auth | inurl:sso | inurl:oauth | inurl:saml
+site:lovable.dev intitle:"admin" | intitle:"administrator" | intitle:"admin panel" | intitle:"control panel"
+site:lovable.dev inurl:jenkins | inurl:grafana | inurl:kibana | inurl:jira | inurl:confluence | inurl:gitlab
+site:lovable.dev inurl:phpmyadmin | inurl:adminer | inurl:phpinfo | inurl:cpanel | inurl:webmail
+site:lovable.dev inurl:console | inurl:management | inurl:portal | inurl:backend | inurl:internal
+site:lovable.dev intitle:"Grafana" | intitle:"Kibana" | intitle:"Elasticsearch" | intitle:"Prometheus"
+site:lovable.dev intitle:"Jupyter" | intitle:"Apache Airflow" | intitle:"Metabase" | intitle:"Superset"
+site:lovable.dev intitle:"GitLab" | intitle:"Jenkins" | intitle:"SonarQube" | intitle:"Nexus"
+site:lovable.dev intitle:"Portainer" | intitle:"Traefik" | intitle:"RabbitMQ" | intitle:"Redis"
+site:lovable.dev intitle:"phpMyAdmin" | intitle:"Adminer" | intitle:"pgAdmin" | intitle:"MongoDB"
+site:lovable.dev inurl:"/wp-admin" | inurl:"/wp-login.php" | inurl:"/administrator/" | inurl:"/admin.php"
+site:lovable.dev intitle:"kubernetes" | intitle:"k8s" | intitle:"docker" | intitle:"rancher"
+site:lovable.dev intitle:"Struts" | intitle:"Spring Boot" | intitle:"Tomcat" | intitle:"WebLogic"
+
+# ===== API, SWAGGER & GRAPHQL =====
+site:lovable.dev inurl:api | inurl:swagger | inurl:api-docs | inurl:openapi | inurl:graphql
+site:lovable.dev inurl:"/api/v1" | inurl:"/api/v2" | inurl:"/api/v3" | inurl:"/v1/" | inurl:"/v2/"
+site:lovable.dev inurl:swagger-ui | inurl:api-explorer | inurl:redoc | inurl:stoplight
+site:lovable.dev intitle:"swagger" | intitle:"api documentation" | intitle:"rest api"
+site:lovable.dev inurl:"/graphql" | inurl:"/graphiql" | inurl:"/__graphql" | inurl:"/playground"
+site:lovable.dev inurl:webhook | inurl:webhooks | inurl:callback | inurl:callbacks
+site:lovable.dev filetype:json "swagger" | "openapi" | "paths" | "definitions"
+site:lovable.dev inurl:postman | filetype:json "postman_collection"
+site:lovable.dev inurl:"/api-docs" | inurl:"/api/swagger" | inurl:"/docs/api"
+
+# ===== ERROR & DEBUG INFO =====
+site:lovable.dev inurl:"error" | intitle:"exception" | intitle:"failure" | "database error"
+site:lovable.dev "SQL syntax" | "SQL error" | "mysql_fetch" | "ORA-" | "PostgreSQL" | "SQLite"
+site:lovable.dev "undefined index" | "unhandled exception" | "stack trace" | "Traceback"
+site:lovable.dev "PHP Parse error" | "PHP Warning" | "PHP Notice" | "PHP Fatal error"
+site:lovable.dev "Error 500" | "Internal Server Error" | "Application Error" | "Whoops!"
+site:lovable.dev intitle:"error" "token" | "api_key" | "secret" | "password" | "database"
+site:lovable.dev "debug" inurl:debug | inurl:test | inurl:dev | inurl:staging
+site:lovable.dev "access_token" | "bearer" | "api_key" ext:json | ext:log
+site:lovable.dev "Warning: mysql_connect()" | "Warning: pg_connect()"
+site:lovable.dev "ORA-01756" | "ORA-00933" | "Microsoft OLE DB" | "ADODB.Field error"
+
+# ===== OPEN REDIRECT & SSRF PARAMS =====
+site:lovable.dev inurl:url= | inurl:return= | inurl:next= | inurl:redirect= | inurl:redir=
+site:lovable.dev inurl:r2= | inurl:page= | inurl:target= | inurl:dest= | inurl:destination= | inurl:go=
+site:lovable.dev inurl:forward= | inurl:location= | inurl:out= | inurl:view= | inurl:from=
+site:lovable.dev inurl:fetch= | inurl:load= | inurl:file= | inurl:path= | inurl:uri= | inurl:href=
+site:lovable.dev inurl:proxy= | inurl:preview= | inurl:embed= | inurl:import= | inurl:export=
+site:lovable.dev inurl:callback= | inurl:src= | inurl:source= | inurl:include= | inurl:template=
+site:lovable.dev inurl:open= | inurl:host= | inurl:domain= | inurl:link= | inurl:jump=
+
+# ===== SQL INJECTION PRONE =====
+site:lovable.dev inurl:q= | inurl:s= | inurl:search= | inurl:query= | inurl:keyword= | inurl:lang=
+site:lovable.dev inurl:id= | inurl:pid= | inurl:uid= | inurl:user_id= | inurl:account= | inurl:no=
+site:lovable.dev inurl:select= | inurl:report= | inurl:role= | inurl:filter= | inurl:cat= | inurl:type=
+site:lovable.dev inurl:cmd= | inurl:exec= | inurl:execute= | inurl:run= | inurl:command=
+site:lovable.dev inurl:order= | inurl:sort= | inurl:group= | inurl:where= | inurl:column=
+site:lovable.dev inurl:update= | inurl:delete= | inurl:remove= | inurl:modify= | inurl:edit=
+site:lovable.dev inurl:item= | inurl:product= | inurl:view= | inurl:detail= | inurl:show=
+
+# ===== CLOUD & INFRASTRUCTURE =====
+site:lovable.dev "s3.amazonaws.com" | "s3-" | "storage.googleapis.com" | "blob.core.windows.net"
+site:lovable.dev "firebaseio.com" | "firebase.google.com" | "appspot.com"
+site:lovable.dev "herokuapps.com" | "herokuapp.com" | "azurewebsites.net" | "cloudfront.net"
+site:lovable.dev "amazonaws.com" "AKIA" | "ASIA" | "AROA"
+"lovable.dev" site:amazonaws.com | site:storage.googleapis.com | site:blob.core.windows.net
+"lovable.dev" "bucket" | "s3" | "storage" site:pastebin.com | site:github.com | site:gitlab.com
+site:lovable.dev inurl:".aws" | inurl:".gcp" | inurl:".azure" | inurl:"cloud-config"
+
+# ===== SOURCE CODE LEAKS =====
+"lovable.dev" site:github.com | site:gitlab.com | site:bitbucket.org
+"lovable.dev" site:github.com password | secret | api_key | token | credential | config
+"lovable.dev" site:github.com ".env" | "config.php" | "settings.py" | "application.yml"
+"lovable.dev" site:github.com "internal" | "staging" | "production" | "dev" password
+"lovable.dev" site:pastebin.com | site:paste.org | site:justpaste.it | site:hastebin.com
+"lovable.dev" site:trello.com | site:notion.so | site:airtable.com "password" | "api_key"
+"lovable.dev" site:jsfiddle.net | site:codepen.io "api_key" | "secret"
+"lovable.dev" site:gist.github.com "password" | "token" | "secret"
+"lovable.dev" site:repl.it | site:glitch.com | site:codesandbox.io
+
+# ===== SUBDOMAIN DISCOVERY =====
+site:*.lovable.dev -site:www.lovable.dev
+site:*.lovable.dev inurl:dev | inurl:staging | inurl:test | inurl:internal | inurl:beta
+site:*.lovable.dev inurl:admin | inurl:api | inurl:mail | inurl:vpn | inurl:remote
+site:*.lovable.dev intitle:"index of" | intitle:"apache" | intitle:"IIS" | intitle:"nginx"
+site:*.lovable.dev ext:php | ext:asp | ext:jsp | ext:aspx | ext:cgi | ext:cfm
+related:lovable.dev -site:lovable.dev
+
+# ===== GITHUB DORKS (search on github.com/search) =====
+org:lovable password
+org:lovable api_key OR apikey OR api_secret
+org:lovable "BEGIN RSA PRIVATE KEY"
+org:lovable ".env"
+org:lovable "config.php" password
+org:lovable "settings.py" SECRET_KEY
+org:lovable "database.yml" password
+org:lovable "credentials" OR "credential"
+org:lovable "AKIA" aws
+org:lovable staging OR internal
+org:lovable "firebaseio.com" databaseURL
+org:lovable "Authorization: Bearer"
+org:lovable "client_secret"
+org:lovable filename:.env
+org:lovable filename:config.json password
+org:lovable filename:*.pem
+org:lovable extension:sql "INSERT INTO" "password"

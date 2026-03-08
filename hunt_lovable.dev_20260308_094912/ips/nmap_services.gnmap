@@ -1,0 +1,16 @@
+# Nmap 7.94SVN scan initiated Sun Mar  8 10:05:03 2026 as: nmap -sV -sC -p 9200,6379,27017,5601,8080,8443,4848,7001 -iL hunt_lovable.dev_20260308_094912/ips/all_ips.txt -oA hunt_lovable.dev_20260308_094912/ips/nmap_services --open
+Host: 104.18.0.51 ()	Status: Up
+Host: 104.18.0.51 ()	Ports: 8080/open/tcp//http//Cloudflare http proxy/, 8443/open/tcp//ssl|https-alt//cloudflare/	Ignored State: filtered (6)
+Host: 104.18.1.51 ()	Status: Up
+Host: 104.18.1.51 ()	Ports: 8080/open/tcp//http//Cloudflare http proxy/, 8443/open/tcp//ssl|https-alt//cloudflare/	Ignored State: filtered (6)
+Host: 104.18.26.175 ()	Status: Up
+Host: 104.18.26.175 ()	Ports: 8080/open/tcp//http//Cloudflare http proxy/, 8443/open/tcp//ssl|https-alt//cloudflare/	Ignored State: filtered (6)
+Host: 104.18.27.175 ()	Status: Up
+Host: 104.18.27.175 ()	Ports: 8080/open/tcp//http//Cloudflare http proxy/, 8443/open/tcp//ssl|https-alt//cloudflare/	Ignored State: filtered (6)
+Host: 104.18.34.146 ()	Status: Up
+Host: 104.18.34.146 ()	Ports: 8080/open/tcp//http//Cloudflare http proxy/, 8443/open/tcp//ssl|https-alt//cloudflare/	Ignored State: filtered (6)
+Host: 172.64.153.110 ()	Status: Up
+Host: 172.64.153.110 ()	Ports: 8080/open/tcp//http//Cloudflare http proxy/, 8443/open/tcp//ssl|https-alt//cloudflare/	Ignored State: filtered (6)
+Host: 185.158.133.1 ()	Status: Up
+Host: 185.158.133.1 ()	Ports: 8080/open/tcp//http//Cloudflare http proxy/, 8443/open/tcp//ssl|https-alt//cloudflare/	Ignored State: filtered (6)
+# Nmap done at Sun Mar  8 10:10:08 2026 -- 28 IP addresses (28 hosts up) scanned in 305.78 seconds

@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.94SVN scan initiated Sun Mar  8 10:05:03 2026 as: nmap -sV -sC -p 9200,6379,27017,5601,8080,8443,4848,7001 -iL hunt_lovable.dev_20260308_094912/ips/all_ips.txt -oA hunt_lovable.dev_20260308_094912/ips/nmap_services -&#45;open -->
+<nmaprun scanner="nmap" args="nmap -sV -sC -p 9200,6379,27017,5601,8080,8443,4848,7001 -iL hunt_lovable.dev_20260308_094912/ips/all_ips.txt -oA hunt_lovable.dev_20260308_094912/ips/nmap_services -&#45;open" start="1772964303" startstr="Sun Mar  8 10:05:03 2026" version="7.94SVN" xmloutputversion="1.05">
+<scaninfo type="connect" protocol="tcp" numservices="8" services="4848,5601,6379,7001,8080,8443,9200,27017"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="64.239.123.1" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="64.239.109.1" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="104.18.1.51" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="185.158.133.1" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="104.18.0.51" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="66.33.60.67" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="142.251.43.147" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="15.161.34.42" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="35.152.117.67" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="76.76.21.93" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="76.76.21.98" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="199.36.158.100" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="172.64.153.110" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="3.33.186.135" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="104.18.34.146" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="104.18.26.175" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="104.18.27.175" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="216.150.1.193" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="216.150.16.193" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="0.0.0.0" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="35.228.158.76" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="3.91.34.37" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="34.49.40.81" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="15.197.167.90" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="52.205.62.94" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="66.33.60.194" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="15.160.106.203" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="161.35.235.194" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<host starttime="1772964306" endtime="1772964608"><status state="up" reason="syn-ack" reason_ttl="0"/>
+<address addr="104.18.0.51" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="filtered" count="6">
+<extrareasons reason="no-response" count="6" proto="tcp" ports="4848,5601,6379,7001,9200,27017"/>
+</extraports>
+<port protocol="tcp" portid="8080"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="http" product="Cloudflare http proxy" method="probed" conf="10"/><script id="http-title" output="Site doesn&apos;t have a title (text/plain; charset=UTF-8)."></script><script id="http-server-header" output="cloudflare"><elem>cloudflare</elem>
+</script></port>
+<port protocol="tcp" portid="8443"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="https-alt" product="cloudflare" tunnel="ssl" method="probed" conf="10"/><script id="http-title" output="400 The plain HTTP request was sent to HTTPS port"><elem key="title">400 The plain HTTP request was sent to HTTPS port</elem>
+</script><script id="http-server-header" output="cloudflare"><elem>cloudflare</elem>
+</script></port>
+</ports>
+<times srtt="469851" rttvar="567928" to="2741563"/>
+</host>
+<host starttime="1772964306" endtime="1772964608"><status state="up" reason="syn-ack" reason_ttl="0"/>
+<address addr="104.18.1.51" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="filtered" count="6">
+<extrareasons reason="no-response" count="6" proto="tcp" ports="4848,5601,6379,7001,9200,27017"/>
+</extraports>
+<port protocol="tcp" portid="8080"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="http" product="Cloudflare http proxy" method="probed" conf="10"/><script id="http-server-header" output="cloudflare"><elem>cloudflare</elem>
+</script><script id="http-title" output="Site doesn&apos;t have a title (text/plain; charset=UTF-8)."></script></port>
+<port protocol="tcp" portid="8443"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="https-alt" product="cloudflare" tunnel="ssl" method="probed" conf="10"/><script id="http-server-header" output="cloudflare"><elem>cloudflare</elem>
+</script><script id="http-title" output="400 The plain HTTP request was sent to HTTPS port"><elem key="title">400 The plain HTTP request was sent to HTTPS port</elem>
+</script></port>
+</ports>
+<times srtt="471483" rttvar="553344" to="2684859"/>
+</host>
+<host starttime="1772964306" endtime="1772964608"><status state="up" reason="syn-ack" reason_ttl="0"/>
+<address addr="104.18.26.175" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="filtered" count="6">
+<extrareasons reason="no-response" count="6" proto="tcp" ports="4848,5601,6379,7001,9200,27017"/>
+</extraports>
+<port protocol="tcp" portid="8080"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="http" product="Cloudflare http proxy" method="probed" conf="10"/><script id="http-server-header" output="cloudflare"><elem>cloudflare</elem>
+</script><script id="http-title" output="Site doesn&apos;t have a title (text/plain; charset=UTF-8)."></script></port>
+<port protocol="tcp" portid="8443"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="https-alt" product="cloudflare" tunnel="ssl" method="probed" conf="10"/><script id="http-server-header" output="cloudflare"><elem>cloudflare</elem>
+</script><script id="http-title" output="400 The plain HTTP request was sent to HTTPS port"><elem key="title">400 The plain HTTP request was sent to HTTPS port</elem>
+</script></port>
+</ports>
+<times srtt="110638" rttvar="92576" to="480942"/>
+</host>
+<host starttime="1772964310" endtime="1772964608"><status state="up" reason="syn-ack" reason_ttl="0"/>
+<address addr="104.18.27.175" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="filtered" count="6">
+<extrareasons reason="no-response" count="6" proto="tcp" ports="4848,5601,6379,7001,9200,27017"/>
+</extraports>
+<port protocol="tcp" portid="8080"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="http" product="Cloudflare http proxy" method="probed" conf="10"/><script id="http-title" output="Site doesn&apos;t have a title (text/plain; charset=UTF-8)."></script><script id="http-server-header" output="cloudflare"><elem>cloudflare</elem>
+</script></port>
+<port protocol="tcp" portid="8443"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="https-alt" product="cloudflare" tunnel="ssl" method="probed" conf="10"/><script id="http-server-header" output="cloudflare"><elem>cloudflare</elem>
+</script><script id="http-title" output="400 The plain HTTP request was sent to HTTPS port"><elem key="title">400 The plain HTTP request was sent to HTTPS port</elem>
+</script></port>
+</ports>
+<times srtt="96824" rttvar="58522" to="330912"/>
+</host>
+<host starttime="1772964306" endtime="1772964608"><status state="up" reason="syn-ack" reason_ttl="0"/>
+<address addr="104.18.34.146" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="filtered" count="6">
+<extrareasons reason="no-response" count="6" proto="tcp" ports="4848,5601,6379,7001,9200,27017"/>
+</extraports>
+<port protocol="tcp" portid="8080"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="http" product="Cloudflare http proxy" method="probed" conf="10"/><script id="http-server-header" output="cloudflare"><elem>cloudflare</elem>
+</script></port>
+<port protocol="tcp" portid="8443"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="https-alt" product="cloudflare" tunnel="ssl" method="probed" conf="10"/><script id="http-title" output="400 The plain HTTP request was sent to HTTPS port"><elem key="title">400 The plain HTTP request was sent to HTTPS port</elem>
+</script><script id="http-server-header" output="cloudflare"><elem>cloudflare</elem>
+</script></port>
+</ports>
+<times srtt="114011" rttvar="103849" to="529407"/>
+</host>
+<host starttime="1772964306" endtime="1772964608"><status state="up" reason="syn-ack" reason_ttl="0"/>
+<address addr="172.64.153.110" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="filtered" count="6">
+<extrareasons reason="no-response" count="6" proto="tcp" ports="4848,5601,6379,7001,9200,27017"/>
+</extraports>
+<port protocol="tcp" portid="8080"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="http" product="Cloudflare http proxy" method="probed" conf="10"/><script id="http-title" output="Site doesn&apos;t have a title (text/plain; charset=UTF-8)."></script><script id="http-server-header" output="cloudflare"><elem>cloudflare</elem>
+</script></port>
+<port protocol="tcp" portid="8443"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="https-alt" product="cloudflare" tunnel="ssl" method="probed" conf="10"/><script id="http-title" output="400 The plain HTTP request was sent to HTTPS port"><elem key="title">400 The plain HTTP request was sent to HTTPS port</elem>
+</script><script id="http-server-header" output="cloudflare"><elem>cloudflare</elem>
+</script></port>
+</ports>
+<times srtt="96485" rttvar="68768" to="371557"/>
+</host>
+<host starttime="1772964306" endtime="1772964608"><status state="up" reason="syn-ack" reason_ttl="0"/>
+<address addr="185.158.133.1" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="filtered" count="6">
+<extrareasons reason="no-response" count="6" proto="tcp" ports="4848,5601,6379,7001,9200,27017"/>
+</extraports>
+<port protocol="tcp" portid="8080"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="http" product="Cloudflare http proxy" method="probed" conf="10"/><script id="http-server-header" output="cloudflare"><elem>cloudflare</elem>
+</script><script id="http-title" output="Site doesn&apos;t have a title (text/plain; charset=UTF-8)."></script></port>
+<port protocol="tcp" portid="8443"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="https-alt" product="cloudflare" tunnel="ssl" method="probed" conf="10"/><script id="http-title" output="400 The plain HTTP request was sent to HTTPS port"><elem key="title">400 The plain HTTP request was sent to HTTPS port</elem>
+</script><script id="http-server-header" output="cloudflare"><elem>cloudflare</elem>
+</script></port>
+</ports>
+<times srtt="465102" rttvar="578181" to="2777826"/>
+</host>
+<runstats><finished time="1772964608" timestr="Sun Mar  8 10:10:08 2026" summary="Nmap done at Sun Mar  8 10:10:08 2026; 28 IP addresses (28 hosts up) scanned in 305.78 seconds" elapsed="305.78" exit="success"/><hosts up="28" down="0" total="28"/>
+</runstats>
+</nmaprun>

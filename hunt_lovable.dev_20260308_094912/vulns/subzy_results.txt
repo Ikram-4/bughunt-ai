@@ -1,0 +1,1 @@
+[ * ] Fingerprints not found; saving them to "/home/ikram/subzy/fingerprints.json"

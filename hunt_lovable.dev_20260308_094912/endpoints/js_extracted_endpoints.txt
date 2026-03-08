@@ -1,0 +1,14 @@
+/__/auth/
+/__/auth/callback
+/__/auth/handler
+/__/auth/iframe
+/__/firebase/init.json
+/callback
+/emulator/auth/handler
+/emulator/auth/iframe
+/handler
+/link
+/plus/v1
+/rpc
+/static/proxy.html
+/url

@@ -1,0 +1,86 @@
+# Nmap 7.94SVN scan initiated Sun Mar  8 10:05:03 2026 as: nmap -sV -sC -p 9200,6379,27017,5601,8080,8443,4848,7001 -iL hunt_lovable.dev_20260308_094912/ips/all_ips.txt -oA hunt_lovable.dev_20260308_094912/ips/nmap_services --open
+Nmap scan report for 104.18.0.51
+Host is up (0.47s latency).
+Not shown: 6 filtered tcp ports (no-response)
+Some closed ports may be reported as filtered due to --defeat-rst-ratelimit
+PORT     STATE SERVICE       VERSION
+8080/tcp open  http          Cloudflare http proxy
+|_http-title: Site doesn't have a title (text/plain; charset=UTF-8).
+|_http-server-header: cloudflare
+8443/tcp open  ssl/https-alt cloudflare
+|_http-title: 400 The plain HTTP request was sent to HTTPS port
+|_http-server-header: cloudflare
+
+Nmap scan report for 104.18.1.51
+Host is up (0.47s latency).
+Not shown: 6 filtered tcp ports (no-response)
+Some closed ports may be reported as filtered due to --defeat-rst-ratelimit
+PORT     STATE SERVICE       VERSION
+8080/tcp open  http          Cloudflare http proxy
+|_http-server-header: cloudflare
+|_http-title: Site doesn't have a title (text/plain; charset=UTF-8).
+8443/tcp open  ssl/https-alt cloudflare
+|_http-server-header: cloudflare
+|_http-title: 400 The plain HTTP request was sent to HTTPS port
+
+Nmap scan report for 104.18.26.175
+Host is up (0.11s latency).
+Not shown: 6 filtered tcp ports (no-response)
+Some closed ports may be reported as filtered due to --defeat-rst-ratelimit
+PORT     STATE SERVICE       VERSION
+8080/tcp open  http          Cloudflare http proxy
+|_http-server-header: cloudflare
+|_http-title: Site doesn't have a title (text/plain; charset=UTF-8).
+8443/tcp open  ssl/https-alt cloudflare
+|_http-server-header: cloudflare
+|_http-title: 400 The plain HTTP request was sent to HTTPS port
+
+Nmap scan report for 104.18.27.175
+Host is up (0.097s latency).
+Not shown: 6 filtered tcp ports (no-response)
+Some closed ports may be reported as filtered due to --defeat-rst-ratelimit
+PORT     STATE SERVICE       VERSION
+8080/tcp open  http          Cloudflare http proxy
+|_http-title: Site doesn't have a title (text/plain; charset=UTF-8).
+|_http-server-header: cloudflare
+8443/tcp open  ssl/https-alt cloudflare
+|_http-server-header: cloudflare
+|_http-title: 400 The plain HTTP request was sent to HTTPS port
+
+Nmap scan report for 104.18.34.146
+Host is up (0.11s latency).
+Not shown: 6 filtered tcp ports (no-response)
+Some closed ports may be reported as filtered due to --defeat-rst-ratelimit
+PORT     STATE SERVICE       VERSION
+8080/tcp open  http          Cloudflare http proxy
+|_http-server-header: cloudflare
+8443/tcp open  ssl/https-alt cloudflare
+|_http-title: 400 The plain HTTP request was sent to HTTPS port
+|_http-server-header: cloudflare
+
+Nmap scan report for 172.64.153.110
+Host is up (0.096s latency).
+Not shown: 6 filtered tcp ports (no-response)
+Some closed ports may be reported as filtered due to --defeat-rst-ratelimit
+PORT     STATE SERVICE       VERSION
+8080/tcp open  http          Cloudflare http proxy
+|_http-title: Site doesn't have a title (text/plain; charset=UTF-8).
+|_http-server-header: cloudflare
+8443/tcp open  ssl/https-alt cloudflare
+|_http-title: 400 The plain HTTP request was sent to HTTPS port
+|_http-server-header: cloudflare
+
+Nmap scan report for 185.158.133.1
+Host is up (0.47s latency).
+Not shown: 6 filtered tcp ports (no-response)
+Some closed ports may be reported as filtered due to --defeat-rst-ratelimit
+PORT     STATE SERVICE       VERSION
+8080/tcp open  http          Cloudflare http proxy
+|_http-server-header: cloudflare
+|_http-title: Site doesn't have a title (text/plain; charset=UTF-8).
+8443/tcp open  ssl/https-alt cloudflare
+|_http-title: 400 The plain HTTP request was sent to HTTPS port
+|_http-server-header: cloudflare
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+# Nmap done at Sun Mar  8 10:10:08 2026 -- 28 IP addresses (28 hosts up) scanned in 305.78 seconds

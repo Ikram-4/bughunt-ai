@@ -1,0 +1,31 @@
+# GitHub Dorks for: lovable.dev
+# Go to: https://github.com/search?q=DORK&type=code
+
+org:lovable password
+org:lovable api_key OR apikey OR api_secret
+org:lovable secret_key OR client_secret
+org:lovable "BEGIN RSA PRIVATE KEY" OR "BEGIN EC PRIVATE KEY"
+org:lovable filename:.env
+org:lovable filename:config.json password
+org:lovable filename:database.yml password
+org:lovable filename:settings.py SECRET_KEY
+org:lovable filename:application.properties password
+org:lovable filename:application.yml password
+org:lovable filename:*.pem
+org:lovable filename:*.ppk
+org:lovable extension:sql "INSERT INTO" "password"
+org:lovable "AKIA" aws OR amazon
+org:lovable "Authorization: Bearer"
+org:lovable "client_id" "client_secret"
+org:lovable staging OR internal OR "do not commit"
+org:lovable "firebaseio.com" databaseURL
+org:lovable "DB_PASSWORD" OR "DATABASE_PASSWORD"
+org:lovable "REDIS_URL" OR "REDIS_PASSWORD"
+org:lovable "STRIPE_SECRET" OR "STRIPE_KEY"
+org:lovable "TWILIO_AUTH_TOKEN" OR "SENDGRID_API_KEY"
+org:lovable "SLACK_TOKEN" OR "SLACK_BOT_TOKEN"
+org:lovable "GITHUB_TOKEN" OR "GH_TOKEN"
+org:lovable "JWT_SECRET" OR "SESSION_SECRET"
+org:lovable "ENCRYPTION_KEY" OR "CRYPTO_KEY"
+"lovable.dev" password OR secret OR token
+"lovable.dev" "api.lovable.dev" internal OR staging

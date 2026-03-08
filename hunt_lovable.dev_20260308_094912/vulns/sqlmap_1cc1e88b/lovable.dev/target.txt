@@ -1,0 +1,1 @@
+http://lovable.dev/_next/image?url=%2Fimg%2Fwired-logo.png&w=384&q=75 (GET)  # /usr/bin/sqlmap -u http://lovable.dev/_next/image?url=%2Fimg%2Fwired-logo.png&w=384&q=75 --batch --level=1 --risk=1 --smart --random-agent --output-dir=hunt_lovable.dev_20260308_094912/vulns/sqlmap_1cc1e88b

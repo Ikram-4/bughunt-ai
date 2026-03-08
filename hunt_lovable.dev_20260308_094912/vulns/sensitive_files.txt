@@ -1,0 +1,4 @@
+https://lovable.dev/robots.txt
+https://lovable.dev/sitemap.xml
+http://lovable.dev/robots.txt
+http://lovable.dev/sitemap.xml

