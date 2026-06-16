@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.94SVN scan initiated Tue Jun 16 17:42:21 2026 as: nmap -sV -sC -p 9200,6379,27017,5601,8080,8443,4848,7001 -iL hunt_aspera.mbc.net_20260616_173900/ips/all_ips.txt -oA hunt_aspera.mbc.net_20260616_173900/ips/nmap_services -&#45;open -->
+<nmaprun scanner="nmap" args="nmap -sV -sC -p 9200,6379,27017,5601,8080,8443,4848,7001 -iL hunt_aspera.mbc.net_20260616_173900/ips/all_ips.txt -oA hunt_aspera.mbc.net_20260616_173900/ips/nmap_services -&#45;open" start="1781631741" startstr="Tue Jun 16 17:42:21 2026" version="7.94SVN" xmloutputversion="1.05">
+<scaninfo type="connect" protocol="tcp" numservices="8" services="4848,5601,6379,7001,8080,8443,9200,27017"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="20.233.118.37" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<runstats><finished time="1781631749" timestr="Tue Jun 16 17:42:29 2026" summary="Nmap done at Tue Jun 16 17:42:29 2026; 1 IP address (1 host up) scanned in 7.26 seconds" elapsed="7.26" exit="success"/><hosts up="1" down="0" total="1"/>
+</runstats>
+</nmaprun>

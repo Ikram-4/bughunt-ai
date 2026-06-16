@@ -8,11 +8,16 @@
 ╚══════════════════════════════════════════════════════════════╝
 """
 
-import os, sys, subprocess, json, re, time, shutil, argparse, hashlib, socket, shlex, math
+import os, sys, subprocess, json, re, time, shutil, argparse, hashlib, socket, shlex, math, signal
 import urllib.request, urllib.error, urllib.parse
 import concurrent.futures
 from datetime import datetime
 from pathlib import Path
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 # ── Color codes ──────────────────────────────────────────────
 R  = "\033[0;31m"
@@ -47,16 +52,41 @@ def die(msg):  print(f"{R}[FATAL]{NC} {msg}"); sys.exit(1)
 
 def run(cmd, timeout=300, capture=True):
     """Run a shell command, return (stdout, returncode)."""
+    if timeout >= 120:
+        info(f"Running external command (timeout {timeout}s): {cmd[:140]}")
     try:
-        r = subprocess.run(
-            cmd, shell=True, text=True, timeout=timeout,
+        kwargs = {}
+        if os.name != "nt":
+            kwargs["start_new_session"] = True
+        p = subprocess.Popen(
+            cmd, shell=True, text=True,
             stdout=subprocess.PIPE if capture else None,
-            stderr=subprocess.DEVNULL
+            stderr=subprocess.DEVNULL,
+            **kwargs
         )
-        return r.stdout.strip() if capture else "", r.returncode
+        stdout, _ = p.communicate(timeout=timeout)
+        if p.returncode != 0:
+            warn(f"Command failed ({p.returncode}): {cmd[:140]}")
+        return stdout.strip() if capture and stdout else "", p.returncode
     except subprocess.TimeoutExpired:
+        try:
+            if os.name != "nt":
+                os.killpg(p.pid, signal.SIGTERM)
+            else:
+                p.kill()
+            p.communicate(timeout=5)
+        except Exception:
+            try:
+                if os.name != "nt":
+                    os.killpg(p.pid, signal.SIGKILL)
+                else:
+                    p.kill()
+            except Exception:
+                pass
+        warn(f"Command timed out after {timeout}s: {cmd[:140]}")
         return "", 1
     except Exception as e:
+        warn(f"Command error: {e}")
         return "", 1
 
 def check_tool(name):
@@ -601,9 +631,12 @@ def phase_params(target, out):
 # ─────────────────────────────────────────────────────────────
 SECRET_PATTERNS = [
     # ── AWS ──
-    ("AWS Access Key",       r"AKIA[0-9A-Z]{16}",                                                    "CRITICAL"),
-    ("AWS Secret Key",       r"(?:aws_secret_access_key|AWS_SECRET_ACCESS_KEY|aws_secret)\s*[:=]\s*[\"']?([A-Za-z0-9/+=]{40})[\"']?", "CRITICAL"),
-    ("AWS Session Token",    r"(?:aws_session_token|AWS_SESSION_TOKEN)\s*[:=]\s*[\"']?[A-Za-z0-9/+=]{100,}[\"']?", "CRITICAL"),
+    ("AWS Access Key",       r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b",                                      "CRITICAL"),
+    ("AWS Access Key Assignment", r"(?:aws[._-]?)?(?:access[._-]?key[._-]?id|accessKeyId|AWSAccessKeyId)\s*[:=]\s*[\"']?(?:AKIA|ASIA)[0-9A-Z]{16}[\"']?", "CRITICAL"),
+    ("AWS Secret Key",       r"(?:aws[._-]?)?(?:secret[._-]?access[._-]?key|secretAccessKey|secret[._-]?key|secretKey|awsSecretAccessKey|AWS_SECRET_ACCESS_KEY|aws_secret)\s*[:=]\s*[\"']?([A-Za-z0-9/+=]{40})[\"']?", "CRITICAL"),
+    ("AWS Session Token",    r"(?:aws[._-]?)?(?:session[._-]?token|sessionToken|AWS_SESSION_TOKEN)\s*[:=]\s*[\"']?[A-Za-z0-9/+=]{80,}[\"']?", "CRITICAL"),
+    ("AWS Username/Name",    r"(?:aws[._-]?(?:user|username|name|login)|awsUser|awsUsername|awsName)\s*[:=]\s*[\"'][^\"']{3,}[\"']", "MEDIUM"),
+    ("AWS Password",         r"(?:aws[._-]?(?:password|passwd|pwd)|awsPassword|awsPass|awsPwd)\s*[:=]\s*[\"'][^\"']{4,}[\"']", "CRITICAL"),
     ("AWS Account ID",       r"(?:aws_account_id|AWS_ACCOUNT_ID)\s*[:=]\s*[\"']?\d{12}[\"']?",       "MEDIUM"),
     ("AWS ARN",              r"arn:aws:[a-zA-Z0-9\-]+:[a-z0-9\-]*:\d{12}:[^\s\"']+",                "MEDIUM"),
     # ── GCP / Firebase ──
@@ -664,10 +697,17 @@ SECRET_PATTERNS = [
     ("Cloudinary URL",       r"cloudinary://\d+:[A-Za-z0-9_\-]+@[a-zA-Z0-9]+",                      "HIGH"),
     ("Sentry DSN",           r"https://[a-f0-9]{32}@[a-z0-9]+\.ingest\.sentry\.io/\d+",             "MEDIUM"),
     ("Datadog Key",          r"(?:datadog|DD).*(?:API|APP).*(?:KEY|key)\s*[:=]\s*[\"']?[a-f0-9]{32,40}[\"']?", "HIGH"),
+    ("LaunchDarkly SDK Key", r"sdk-[a-f0-9]{24,}",                                                   "HIGH"),
+    ("Sentry Auth Token",    r"sntryu_[A-Za-z0-9_\-]{20,}",                                          "HIGH"),
+    ("Vercel Token",         r"(?:vercel|VERCEL).*?(?:token|TOKEN)\s*[:=]\s*[\"'][A-Za-z0-9_\-]{20,}[\"']", "HIGH"),
+    ("Clerk Key",            r"(?:pk|sk)_(?:test|live)_[A-Za-z0-9]{20,}",                            "HIGH"),
+    ("Razorpay Key",         r"rzp_(?:test|live)_[A-Za-z0-9]{14,}",                                  "MEDIUM"),
     # ── Generic High-Value ──
     ("API Key Generic",      r"(?:api[._-]?key|apikey|api[._-]?secret|access[._-]?key)\s*[:=]+\s*[\"'][^\"']{10,}[\"']", "HIGH"),
+    ("Frontend Env Value",   r"(?:REACT_APP|NEXT_PUBLIC|VITE|PUBLIC)_[A-Z0-9_]{3,}\s*[:=]\s*[\"'][^\"']{8,}[\"']", "MEDIUM"),
     ("Secret Generic",       r"(?:secret|SECRET|private[._-]?key|PRIVATE[._-]?KEY|auth[._-]?token|AUTH[._-]?TOKEN)\s*[:=]+\s*[\"'][^\"']{10,}[\"']", "HIGH"),
-    ("Password",             r"(?:password|passwd|pwd|PASS|PASSWORD)\s*[:=]+\s*[\"'][^\"']{6,}[\"']", "HIGH"),
+    ("Password",             r"(?:password|passwd|pwd|passphrase|PASS|PASSWORD)\s*[:=]+\s*[\"'][^\"']{4,}[\"']", "HIGH"),
+    ("Username/Login",       r"(?:username|user_name|login|account|client[._-]?id|clientId)\s*[:=]+\s*[\"'][^\"']{3,}[\"']", "MEDIUM"),
     ("Encryption Key",       r"(?:encryption[._-]?key|ENCRYPTION[._-]?KEY|crypto[._-]?key|aes[._-]?key)\s*[:=]+\s*[\"'][^\"']{10,}[\"']", "HIGH"),
     ("Internal URL",         r"https?://(internal\.|staging\.|dev\.|localhost|127\.0\.0\.1|192\.168\.|10\.)[^\s\"']+", "MEDIUM"),
     # ── Dev Hygiene ──
@@ -688,71 +728,471 @@ def calc_shannon_entropy(s):
     length = len(s)
     return -sum((count/length) * math.log2(count/length) for count in freq.values())
 
-def scan_js_secrets(js_dir, secrets_dir):
-    """Scan all downloaded JS files for secrets + entropy-based detection."""
-    js_files = list(Path(js_dir).glob("*.js"))
-    if not js_files:
+def scan_js_secrets(js_dir, secrets_dir, extra_dirs=None):
+    """Scan downloaded JS and extracted sources for secrets + credential pairs."""
+    secrets_dir = Path(secrets_dir)
+    scan_roots = [Path(js_dir)]
+    for extra in extra_dirs or []:
+        extra = Path(extra)
+        if extra.exists():
+            scan_roots.append(extra)
+
+    allowed_suffixes = {".js", ".mjs", ".jsx", ".ts", ".tsx", ".map", ".txt"}
+    scan_files = []
+    seen_paths = set()
+    for root in scan_roots:
+        if not root.exists():
+            continue
+        for path in root.rglob("*"):
+            if not path.is_file() or path.suffix.lower() not in allowed_suffixes:
+                continue
+            resolved = str(path.resolve())
+            if resolved in seen_paths:
+                continue
+            seen_paths.add(resolved)
+            if path.parent.name in ("maps", "sources"):
+                label = f"{path.parent.name}/{path.name}"
+            else:
+                label = path.name
+            scan_files.append((path, label))
+
+    if not scan_files:
         return {}
 
     findings = {}
+
+    def save_finding(pattern_name, severity, matches):
+        if not matches:
+            return
+        deduped = []
+        seen = set()
+        for item in matches:
+            marker = (item.get("file", ""), item.get("match", ""), item.get("context", ""))
+            if marker in seen:
+                continue
+            seen.add(marker)
+            deduped.append(item)
+        if not deduped:
+            return
+        findings[pattern_name] = {"severity": severity, "matches": deduped}
+        safe_name = pattern_name.lower().replace(' ', '_').replace('/', '_')
+        out_file = secrets_dir / f"js_{safe_name}.json"
+        import json as _json
+        with open(out_file, "w") as f:
+            _json.dump(deduped, f, indent=2)
+
     for pattern_name, pattern, severity in SECRET_PATTERNS:
         matches = []
         regex = re.compile(pattern, re.IGNORECASE)
-        for jsf in js_files:
+        for jsf, label in scan_files:
             try:
                 content = jsf.read_text(errors="ignore")
                 for m in regex.finditer(content):
-                    snippet = content[max(0, m.start()-30):m.end()+30].replace("\n", " ")
-                    matches.append({"file": jsf.name, "match": m.group(), "context": snippet})
+                    snippet = content[max(0, m.start()-80):m.end()+120].replace("\n", " ")
+                    matches.append({"file": label, "match": m.group(), "context": snippet[:300]})
             except:
                 pass
-        if matches:
-            findings[pattern_name] = {"severity": severity, "matches": matches}
-            safe_name = pattern_name.lower().replace(' ', '_').replace('/', '_')
-            out_file = secrets_dir / f"js_{safe_name}.json"
-            import json as _json
-            with open(out_file, "w") as f:
-                _json.dump(matches, f, indent=2)
+        save_finding(pattern_name, severity, matches)
+
+    kv_re = re.compile(
+        r"""(?:(?P<q>["'])(?P<qkey>[A-Za-z0-9_$ .\-]{2,80})(?P=q)|(?P<key>[A-Za-z_$][\w$.-]{1,80}))"""
+        r"""\s*[:=]\s*(?P<quote>["'`])(?P<value>[^"'`\r\n]{3,300})(?P=quote)""",
+        re.IGNORECASE
+    )
+    placeholder_values = {"true", "false", "null", "undefined", "none", "todo", "changeme", "change_me", "example", "sample"}
+
+    def norm_key(key):
+        return re.sub(r"[^a-z0-9]", "", key.lower())
+
+    def is_secret_key(key):
+        k = norm_key(key)
+        return any(x in k for x in [
+            "password", "passwd", "pwd", "passphrase", "secret", "token", "credential",
+            "privatekey", "clientsecret", "apikey", "accesskey", "secretaccesskey", "sessiontoken"
+        ])
+
+    def is_identity_key(key, context=""):
+        k = norm_key(key)
+        ctx = context.lower()
+        if any(x in k for x in ["username", "user", "login", "email", "account", "clientid", "accesskeyid", "awsname", "awsuser"]):
+            return True
+        return k == "name" and ("aws" in ctx or "credential" in ctx or "auth" in ctx)
+
+    def is_aws_context(key, context):
+        k = norm_key(key)
+        ctx = context.lower()
+        return "aws" in k or "aws" in ctx or "amazonaws" in ctx or "accesskeyid" in k or "secretaccesskey" in k
+
+    assignment_hits = []
+    aws_assignment_hits = []
+    credential_pair_hits = []
+    aws_pair_hits = []
+
+    for jsf, label in scan_files:
+        try:
+            content = jsf.read_text(errors="ignore")
+        except:
+            continue
+
+        kvs = []
+        for m in kv_re.finditer(content):
+            key = (m.group("qkey") or m.group("key") or "").strip()
+            value = (m.group("value") or "").strip()
+            if not key or value.lower() in placeholder_values:
+                continue
+            context = content[max(0, m.start()-250):m.end()+250].replace("\n", " ")
+            kvs.append({"key": key, "value": value, "start": m.start(), "end": m.end(), "context": context})
+
+            if is_secret_key(key) and len(value) >= 4:
+                hit_item = {
+                    "file": label,
+                    "match": f"{key}={value[:100]}",
+                    "context": context[:350]
+                }
+                assignment_hits.append(hit_item)
+                if is_aws_context(key, context):
+                    aws_assignment_hits.append(hit_item)
+            elif is_aws_context(key, context) and is_identity_key(key, context) and len(value) >= 3:
+                aws_assignment_hits.append({
+                    "file": label,
+                    "match": f"{key}={value[:100]}",
+                    "context": context[:350]
+                })
+
+        identities = [item for item in kvs if is_identity_key(item["key"], item["context"])]
+        secrets = [item for item in kvs if is_secret_key(item["key"]) and len(item["value"]) >= 4]
+        for secret in secrets:
+            for identity in identities:
+                if abs(secret["start"] - identity["start"]) > 1800:
+                    continue
+                start = max(0, min(secret["start"], identity["start"]) - 250)
+                end = min(len(content), max(secret["end"], identity["end"]) + 250)
+                context = content[start:end].replace("\n", " ")[:500]
+                pair = {
+                    "file": label,
+                    "match": f"{identity['key']}={identity['value'][:80]} | {secret['key']}={secret['value'][:80]}",
+                    "context": context
+                }
+                if is_aws_context(identity["key"] + secret["key"], context):
+                    aws_pair_hits.append(pair)
+                else:
+                    credential_pair_hits.append(pair)
+
+    save_finding("Sensitive Key Assignment", "HIGH", assignment_hits)
+    save_finding("AWS Named Credential", "CRITICAL", aws_assignment_hits)
+    save_finding("Credential Pair", "CRITICAL", credential_pair_hits)
+    save_finding("AWS Credential Pair", "CRITICAL", aws_pair_hits)
 
     # ── Entropy-based secret detection ──
-    # Catches secrets that don't match any known pattern
+    # Catches secrets that don't match any known pattern.
+    # Match both standalone keywords AND keywords embedded in camelCase/snake_case/PascalCase identifiers.
     high_entropy_re = re.compile(
-        r"""(?:secret|key|token|password|auth|credential|apikey|api_key|access_key|private)"""
-        r"""\s*[:=]\s*["']([A-Za-z0-9+/=_\-]{20,})["']""",
+        r"""(?:[a-zA-Z0-9_$]*?(?:secret|key|token|password|passwd|pwd|passphrase|credential|apikey|api_key|access_key|private|session|auth|hash|salt|cipher)[a-zA-Z0-9_$]*?)"""
+        r"""\s*[:=]\s*["']([A-Za-z0-9+/=_\-.$@!]{16,})["']""",
         re.IGNORECASE
     )
     entropy_hits = []
-    for jsf in js_files:
+    for jsf, label in scan_files:
         try:
             content = jsf.read_text(errors="ignore")
             for m in high_entropy_re.finditer(content):
                 val = m.group(1)
                 ent = calc_shannon_entropy(val)
-                # High entropy (>4.0) with decent length = likely real secret
-                if ent > 4.0 and len(val) >= 20:
-                    snippet = content[max(0, m.start()-20):m.end()+20].replace("\n", " ")
+                if ent > 3.5 and len(val) >= 16 and val.lower() not in ("true", "false", "null", "undefined", "none"):
+                    snippet = content[max(0, m.start()-80):m.end()+120].replace("\n", " ")
                     entropy_hits.append({
-                        "file": jsf.name,
-                        "match": val[:60] + ("..." if len(val) > 60 else ""),
+                        "file": label,
+                        "match": val[:80] + ("..." if len(val) > 80 else ""),
                         "entropy": round(ent, 2),
-                        "context": snippet
+                        "context": snippet[:300]
                     })
         except:
             pass
 
-    if entropy_hits:
-        findings["High Entropy Secrets"] = {"severity": "HIGH", "matches": entropy_hits}
-        out_file = secrets_dir / "js_high_entropy_secrets.json"
-        import json as _json
-        with open(out_file, "w") as f:
-            _json.dump(entropy_hits, f, indent=2)
+    save_finding("High Entropy Secrets", "HIGH", entropy_hits)
+
+    # ── Naked Credential Scan ──
+    # Catches credential-like values that appear without a key-value assignment or
+    # that don't fit the entropy regex pattern but are clearly credentials.
+    naked_re = re.compile(
+        r"""["']([A-Za-z0-9+/=_\-.$@!\\]{20,})["']""",
+        re.IGNORECASE
+    )
+    naked_cred_hits = []
+    seen_naked = set()
+    for jsf, label in scan_files:
+        try:
+            content = jsf.read_text(errors="ignore")
+        except Exception:
+            continue
+        for m in naked_re.finditer(content):
+            val = m.group(1)
+            if len(val) < 20 or len(val) > 500:
+                continue
+            val_lower = val.lower()
+            if val_lower in ("true", "false", "null", "undefined", "none", "changeme", "example"):
+                continue
+            # Skip values that look like typical non-secret patterns (URLs, dates, hex colors, etc.)
+            if re.match(r"^[a-fA-F0-9]{32,}$", val):
+                continue  # pure hex md5/sha1-like hashes are too noisy
+            if re.match(r"^https?://", val):
+                continue
+            if re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", val):
+                continue  # email
+            # Check if this value is near a credential-like keyword in the surrounding context
+            start = max(0, m.start() - 200)
+            end = min(len(content), m.end() + 200)
+            context = content[start:end].lower()
+            if not any(kw in context for kw in
+                ["password", "secret", "token", "key", "auth", "credential",
+                 "access", "login", "user", "admin", "passwd", "pwd",
+                 "aws", "api", "private", "bearer", "jwt", "session"]):
+                continue
+            ent = calc_shannon_entropy(val)
+            if ent < 3.2 and not any(val.startswith(prefix) for prefix in ("AKIA", "ASIA", "eyJ", "sk-", "ghp_", "gho_", "ghs_", "ghr_", "xox", "glpat", "dop_v", "npm_")):
+                continue
+            marker = (label, val[:60])
+            if marker in seen_naked:
+                continue
+            seen_naked.add(marker)
+            snippet = content[max(0, m.start()-80):m.end()+120].replace("\n", " ")
+            naked_cred_hits.append({
+                "file": label,
+                "match": val[:80] + ("..." if len(val) > 80 else ""),
+                "entropy": round(ent, 2),
+                "context": snippet[:350]
+            })
+
+    save_finding("Naked Credential (untyped)", "HIGH", naked_cred_hits)
 
     return findings
+
+
+# ─────────────────────────────────────────────────────────────
+# AI-POWERED SECRET SCANNING (optional — overrides regex)
+# ─────────────────────────────────────────────────────────────
+# When enabled via --ai-secrets, this function scans all JS files
+# and extracted source-map sources using an LLM instead of regex.
+#
+# Supported providers (set via --ai-provider):
+#   openai   – OpenAI-compatible API (env: OPENAI_API_KEY)
+#   ollama   – local Ollama (default http://localhost:11434, env: OLLAMA_HOST)
+#
+# Returns a list of finding dicts compatible with the per-file report.
+# -----------------------------------------------------------------
+AI_CONFIG = {"enabled": False, "only": False, "provider": "openai", "model": None, "api_key": None, "api_base": None}
+
+def ai_scan_js_secrets(files_dir, maps_dir, secrets_dir):
+    """Use an LLM to find secrets in JS files and extracted source-map sources.
+    Returns a list of {severity, type, file, match, context} dicts or empty list.
+    """
+    cfg = AI_CONFIG
+    provider = cfg.get("provider", "openai")
+    model = cfg.get("model")
+    api_key = cfg.get("api_key") or os.environ.get("OPENAI_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
+    api_base = cfg.get("api_base") or os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+
+    if provider == "ollama":
+        api_base = api_base.rstrip("/")
+
+    # Gather all scan targets (JS files + extracted source-map sources)
+    scan_roots = [Path(files_dir)]
+    sources_dir = Path(str(maps_dir)) / "sources"
+    if sources_dir.exists():
+        scan_roots.append(sources_dir)
+    scan_targets = []
+    for root in scan_roots:
+        if not root.exists():
+            continue
+        for p in sorted(root.rglob("*")):
+            if not p.is_file():
+                continue
+            if p.suffix.lower() not in (".js", ".mjs", ".jsx", ".ts", ".tsx", ".txt", ".json", ".env"):
+                continue
+            # Derive a short label that includes parent dir context (files/ vs sources/)
+            rel = p.relative_to(root.parent if root.name in ("files", "sources") else root)
+            scan_targets.append((str(rel), p))
+
+    if not scan_targets:
+        return []
+
+    total = len(scan_targets)
+    info(f"AI secret scan: {total} file(s) across {len(scan_roots)} source(s) via {provider}")
+
+    system_prompt = (
+        "You are a JavaScript security analyst. Your task is to find hardcoded "
+        "secrets, credentials, API keys, tokens, passwords, and other sensitive "
+        "strings in JavaScript source code.\n\n"
+        "Rules:\n"
+        "- Return ONLY a valid JSON array. No markdown, no explanation.\n"
+        "- If nothing is found, return []\n"
+        "- Each element must have these keys:\n"
+        '  "type": short label like "AWS Access Key" / "Password" / "API Token"\n'
+        '  "value": the full secret or first 120 chars\n'
+        '  "file": the filename (use the exact label provided after ``FILE:``)\n'
+        '  "line": approximate line number (or 0 if unsure)\n'
+        '  "confidence": "high" or "medium"\n'
+        "- Only report real secrets. Ignore placeholder values like 'your-api-key', 'changeme', 'password123', example.com.\n"
+        "- Be thorough: look for base64-encoded credentials, JWT tokens, AWS keys (AKIA...), "
+        "Google API keys (AIza...), private keys, connection strings, hardcoded passwords, "
+        "OAuth tokens, bearer tokens, and any credential-like strings.\n"
+        "- Report a secret even if it looks obfuscated or split across variables.\n"
+    )
+
+    headers_json = {"Content-Type": "application/json"}
+    all_findings = []
+    seen_markers = set()
+    files_skipped = 0
+
+    for label, filepath in scan_targets:
+        try:
+            body = filepath.read_text(errors="ignore")
+        except Exception:
+            continue
+        if not body.strip():
+            continue
+
+        # Skip files that are obviously large bundles (over 50k chars) — send last 30k + first 5k
+        chunk = body
+        if len(body) > 50000:
+            chunk = body[:5000] + "\n\n... [SNIPPED] ...\n\n" + body[-30000:]
+            files_skipped += 1
+
+        # Wrap with a file marker so the AI can report which file a secret is in
+        user_msg = f"FILE: {label}\n```javascript\n{chunk[:32000]}\n```"
+
+        payload = None
+        try:
+            if provider == "ollama":
+                effective_model = model or "llama3"
+                payload = json.dumps({
+                    "model": effective_model,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_msg}
+                    ],
+                    "stream": False,
+                    "options": {"num_predict": 2048, "temperature": 0.1}
+                }).encode()
+                req = urllib.request.Request(
+                    f"{api_base}/api/chat",
+                    data=payload,
+                    headers=headers_json,
+                    method="POST"
+                )
+            else:
+                # default: OpenAI-compatible
+                effective_key = api_key or os.environ.get("OPENAI_API_KEY", "")
+                effective_model = model or "gpt-4o-mini"
+                if not effective_key:
+                    warn("OPENAI_API_KEY not set — skipping AI scan")
+                    return []
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {effective_key}"
+                }
+                payload = json.dumps({
+                    "model": effective_model,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_msg}
+                    ],
+                    "max_tokens": 2048,
+                    "temperature": 0.1
+                }).encode()
+                req = urllib.request.Request(
+                    f"{cfg.get('api_base') or 'https://api.openai.com/v1'}/chat/completions",
+                    data=payload,
+                    headers=headers,
+                    method="POST"
+                )
+
+            resp = urllib.request.urlopen(req, timeout=120)
+            raw = resp.read().decode("utf-8", errors="ignore")
+            data = json.loads(raw)
+
+            if provider == "ollama":
+                content = data.get("message", {}).get("content", "")
+            else:
+                content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+            if not content:
+                continue
+
+            # AI may try to wrap in markdown fences; strip those
+            clean = content.strip()
+            if clean.startswith("```"):
+                clean = clean.split("\n", 1)[-1]
+                clean = clean.rsplit("```", 1)[0]
+            clean = clean.strip()
+
+            if clean.startswith("["):
+                try:
+                    items = json.loads(clean)
+                    if isinstance(items, list):
+                        for item in items:
+                            if not isinstance(item, dict):
+                                continue
+                            ftype = item.get("type", "Unknown") or "Unknown"
+                            fval = (item.get("value") or "")[:120]
+                            ffile = item.get("file") or label
+                            fline = item.get("line", 0) or 0
+                            conf = item.get("confidence", "medium") or "medium"
+                            sev = "CRITICAL" if conf == "high" else "HIGH"
+                            marker = (ffile, fval[:60])
+                            if marker in seen_markers:
+                                continue
+                            seen_markers.add(marker)
+                            all_findings.append({
+                                "severity": sev,
+                                "type": ftype,
+                                "file": ffile,
+                                "match": fval,
+                                "line": fline,
+                                "context": f"[AI {provider}/{conf}] {ftype}"
+                            })
+                except Exception:
+                    pass
+        except urllib.error.HTTPError as e:
+            body_err = e.read().decode(errors="ignore")[:300]
+            warn(f"AI API error for {label} (HTTP {e.code}): {body_err}")
+        except urllib.error.URLError:
+            if provider == "ollama":
+                warn(f"Ollama not reachable at {api_base}. Is it running?")
+            else:
+                warn(f"API unreachable. Check --ai-api-base or network.")
+            break  # no point retrying if the service is down
+        except (json.JSONDecodeError, socket.timeout, Exception) as e:
+            warn(f"AI parse/connection error for {label}: {e}")
+
+    if files_skipped:
+        info(f"AI scan: {files_skipped} large file(s) were truncated")
+
+    # Save results
+    if all_findings:
+        findings_file = Path(secrets_dir) / "js_ai_findings.json"
+        with open(findings_file, "w") as f:
+            json.dump(all_findings, f, indent=2)
+        txt_lines = []
+        for item in all_findings:
+            txt_lines.append(f"[{item['severity']}] {item['type']} in {item['file']} (line {item.get('line', '?')})")
+            txt_lines.append(f"  Value: {item['match']}")
+            txt_lines.append("")
+        (Path(secrets_dir) / "js_ai_findings.txt").write_text("\n".join(txt_lines))
+        hit(f"AI secrets found: {len(all_findings)} → secrets/js_ai_findings.json")
+    else:
+        ok("AI scan: no secrets found")
+
+    return all_findings
+
 
 def generate_js_findings_report(js_dir, secrets_dir, findings):
     """Generate a per-file report: for each JS file, list what was found in it."""
     files_dir = Path(js_dir) / "files"
+    source_dir = Path(js_dir) / "maps" / "sources"
     js_files = list(files_dir.glob("*.js"))
+    if source_dir.exists():
+        js_files.extend([p for p in source_dir.rglob("*") if p.is_file() and p.suffix.lower() in (".js", ".mjs", ".jsx", ".ts", ".tsx", ".txt")])
     if not js_files:
         return
 
@@ -888,15 +1328,156 @@ def phase_js(target, out):
 
     js_urls_file = js_dir / "js_urls.txt"
 
+    def normalize_js_url(ref, base_url=None):
+        ref = (ref or "").strip().strip('"\'`<>')
+        if not ref or ref.startswith(("data:", "blob:", "javascript:")):
+            return None
+        if ref.startswith("//"):
+            ref = "https:" + ref
+        elif base_url and not ref.startswith(("http://", "https://")):
+            ref = urllib.parse.urljoin(base_url, ref)
+        if not ref.startswith(("http://", "https://")):
+            return None
+        parsed = urllib.parse.urlparse(ref)
+        path = parsed.path.lower()
+        if path.endswith((".js", ".mjs", ".jsx", ".ts", ".tsx")) or "/_next/static/" in path or "/assets/" in path or "/static/" in path:
+            return urllib.parse.urlunparse(parsed._replace(fragment=""))
+        return None
+
+    def extract_js_refs(content, base_url=None):
+        refs = set()
+        patterns = [
+            r'<script[^>]+src=["\']([^"\']+)["\']',
+            r'(?:import|from)\s*["\']([^"\']+)["\']',
+            r'import\s*\(\s*["\']([^"\']+)["\']\s*\)',
+            r'(?:require|importScripts|load)\s*\(\s*["\']([^"\']+)["\']\s*\)',
+            r'(?:src|href|url)\s*[:=]\s*["\']([^"\']+\.(?:js|mjs|jsx|ts|tsx)(?:[?#][^"\']*)?)["\']',
+            r'["\']([^"\']+\.(?:js|mjs|jsx|ts|tsx)(?:[?#][^"\']*)?)["\']',
+            r'sourceMappingURL=([^\s*]+)',
+        ]
+        for pat in patterns:
+            for m in re.finditer(pat, content, flags=re.I):
+                ref = m.group(1)
+                if ref.endswith(".map"):
+                    ref = ref[:-4]
+                url = normalize_js_url(ref, base_url)
+                if url:
+                    refs.add(url)
+        return refs
+
+    def extract_source_map_refs(content, base_url=None):
+        refs = set()
+        for m in re.finditer(r'sourceMappingURL=([^\s*]+)', content, flags=re.I):
+            ref = m.group(1).strip().strip('"\'`)')
+            if not ref or ref.startswith("data:"):
+                continue
+            if ref.startswith("//"):
+                ref = "https:" + ref
+            elif base_url and not ref.startswith(("http://", "https://")):
+                ref = urllib.parse.urljoin(base_url, ref)
+            if ref.startswith(("http://", "https://")) and ".map" in urllib.parse.urlparse(ref).path.lower():
+                refs.add(urllib.parse.urlunparse(urllib.parse.urlparse(ref)._replace(fragment="")))
+        return refs
+
+    def extract_manifest_js_refs(content, manifest_url):
+        refs = set()
+        parsed_manifest = urllib.parse.urlparse(manifest_url)
+        origin = f"{parsed_manifest.scheme}://{parsed_manifest.netloc}"
+        cleaned = content.replace("\\/", "/").replace("\\u002F", "/").replace("\\u002f", "/")
+
+        def add_ref(ref):
+            ref = (ref or "").strip().strip('"\'`,')
+            if not ref:
+                return
+            normalized = normalize_js_url(ref, manifest_url)
+            if not normalized and ref.startswith("static/") and "/_next/static/" in parsed_manifest.path:
+                normalized = normalize_js_url(f"{origin}/_next/{ref}")
+            if not normalized and ref.startswith("chunks/"):
+                normalized = normalize_js_url(f"{origin}/_next/static/{ref}")
+            if normalized:
+                refs.add(normalized)
+
+        def walk_json(obj):
+            if isinstance(obj, dict):
+                for v in obj.values():
+                    walk_json(v)
+            elif isinstance(obj, list):
+                for v in obj:
+                    walk_json(v)
+            elif isinstance(obj, str):
+                add_ref(obj)
+
+        try:
+            walk_json(json.loads(cleaned))
+        except Exception:
+            pass
+
+        for m in re.finditer(r'([A-Za-z0-9_./@-]+\.(?:js|mjs|jsx|ts|tsx)(?:[?#][^"\'`\s,)]*)?)', cleaned, flags=re.I):
+            add_ref(m.group(1))
+        for m in re.finditer(r'(/_next/static/[^"\'`\s,)]*\.(?:js|mjs)(?:[?#][^"\'`\s,)]*)?)', cleaned, flags=re.I):
+            add_ref(origin + m.group(1))
+        return refs
+
     # Collect JS URLs
     info("Collecting JS URLs from all sources...")
     run(f"cat {ep_dir}/all_urls.txt 2>/dev/null | grep -E '\\.js([\\?#]|$)' | sort -u > {js_urls_file}")
     run(f"cat {ep_dir}/gau_urls.txt 2>/dev/null | grep -E '\\.js([\\?#]|$)' | sort -u >> {js_urls_file}")
 
+    collected_js = set(read_lines(js_urls_file))
+    for src_file in [ep_dir / "all_urls.txt", ep_dir / "gau_urls.txt", ep_dir / "katana_unauth.txt", ep_dir / "katana_auth.txt"]:
+        for url in read_lines(src_file):
+            normalized = normalize_js_url(url)
+            if normalized:
+                collected_js.add(normalized)
+
+    # Pull script tags from live HTML pages. This catches webpack/vite/next chunks that crawlers miss.
+    live_urls = read_lines(web_dir / "live_urls.txt")
+    if not live_urls:
+        live_urls = [f"https://{target}", f"http://{target}"]
+    info("Extracting script URLs from live HTML pages...")
+    base_origins = set()
+    next_build_ids = set()
+    for page_url in live_urls[:50]:
+        parsed_page = urllib.parse.urlparse(page_url)
+        if parsed_page.scheme and parsed_page.netloc:
+            base_origins.add(f"{parsed_page.scheme}://{parsed_page.netloc}")
+        body, code = fetch_url(page_url, timeout=10)
+        if code in (200, 401, 403) and body:
+            collected_js.update(extract_js_refs(body, page_url))
+            for m in re.finditer(r'/_next/static/([^/"\']+)/', body):
+                next_build_ids.add((f"{parsed_page.scheme}://{parsed_page.netloc}", m.group(1)))
+            for m in re.finditer(r'"buildId"\s*:\s*"([^"\\]+)"', body):
+                next_build_ids.add((f"{parsed_page.scheme}://{parsed_page.netloc}", m.group(1)))
+
+    # Framework manifests often reveal chunks that crawlers never request directly.
+    info("Checking framework build manifests for hidden JS chunks...")
+    manifest_urls = set()
+    for origin in sorted(base_origins)[:20]:
+        for path in ["/asset-manifest.json", "/manifest.json", "/build/manifest.json", "/mix-manifest.json", "/vite-manifest.json"]:
+            manifest_urls.add(origin.rstrip("/") + path)
+    for origin, build_id in sorted(next_build_ids)[:50]:
+        manifest_urls.add(f"{origin}/_next/static/{build_id}/_buildManifest.js")
+        manifest_urls.add(f"{origin}/_next/static/{build_id}/_ssgManifest.js")
+
+    checked_manifests = []
+    for manifest_url in sorted(manifest_urls)[:150]:
+        body, code = fetch_url(manifest_url, timeout=8)
+        if code == 200 and body:
+            refs = extract_manifest_js_refs(body, manifest_url)
+            if refs:
+                checked_manifests.append(f"{manifest_url} -> {len(refs)} JS refs")
+                collected_js.update(refs)
+    if checked_manifests:
+        (js_dir / "js_manifests_checked.txt").write_text("\n".join(checked_manifests) + "\n")
+        ok(f"Framework manifests added JS refs: {len(checked_manifests)} manifest(s)")
+
     if check_tool("getJS"):
-        live_urls = read_lines(web_dir / "live_urls.txt")
         for url in live_urls[:20]:
             run(f"getJS --url '{url}' --complete --nocolors 2>/dev/null >> {js_urls_file}")
+
+    with open(js_urls_file, "a") as f:
+        for url in sorted(collected_js):
+            f.write(url + "\n")
 
     run(f"sort -u {js_urls_file} -o {js_urls_file}")
     js_count = count_lines(js_urls_file)
@@ -905,68 +1486,54 @@ def phase_js(target, out):
     # Download JS files
     info("Downloading JS files locally...")
     js_urls = read_lines(js_urls_file)
+    source_by_file = {}
 
     def download_js(url):
         try:
             fname = hashlib.md5(url.encode()).hexdigest() + ".js"
             out_path = files_dir / fname
             if out_path.exists():
-                return
+                source_by_file[out_path.name] = url
+                return out_path.name
             body, code = fetch_url(url, timeout=15)
-            if code == 200 and body:
+            if code in (200, 401, 403) and body and ("javascript" in body[:500].lower() or len(body) > 200):
                 out_path.write_text(body, errors="ignore")
+                source_by_file[out_path.name] = url
+                return out_path.name
         except:
             pass
+        return None
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=20) as ex:
-        list(ex.map(download_js, js_urls[:1000]))
+        list(ex.map(download_js, js_urls[:3000]))
 
     downloaded = len(list(files_dir.glob("*.js")))
     ok(f"Downloaded: {downloaded} JS files")
 
-    # ── Recursive JS Crawling — discover JS imports inside JS ──
-    info("Recursive JS crawling (depth 2) — finding imports inside JS files...")
-    import_patterns = [
-        r'(?:import|from)\s+["\']([^"\']+\.js)["\']',
-        r'(?:require)\s*\(\s*["\']([^"\']+\.js)["\']',
-        r'<script[^>]+src=["\']([^"\']+\.js)["\']',
-        r'(?:importScripts|load)\s*\(\s*["\']([^"\']+\.js)["\']',
-        r'["\'](https?://[^\s"\']+\.js)["\']',
-    ]
+    # ── Recursive JS Crawling — discover JS imports/chunks inside JS ──
+    info("Recursive JS crawling (depth 3) — finding imports/chunks inside JS files...")
     discovered_imports = set()
-    for depth in range(2):
+    for depth in range(3):
         new_js = set()
         for jsf in files_dir.glob("*.js"):
             try:
                 content = jsf.read_text(errors="ignore")
-                for pat in import_patterns:
-                    for m in re.finditer(pat, content):
-                        ref = m.group(1)
-                        # Resolve relative URLs to absolute
-                        if ref.startswith("http"):
-                            new_js.add(ref)
-                        elif ref.startswith("//"):
-                            new_js.add("https:" + ref)
-                        elif ref.startswith("/"):
-                            # Try to resolve against known base URLs
-                            for base in js_urls[:5]:
-                                try:
-                                    parsed = urllib.parse.urlparse(base)
-                                    full = f"{parsed.scheme}://{parsed.netloc}{ref}"
-                                    new_js.add(full)
-                                    break
-                                except:
-                                    pass
+                base_url = source_by_file.get(jsf.name)
+                if not base_url and js_urls:
+                    base_url = js_urls[0]
+                new_js.update(extract_js_refs(content, base_url))
             except:
                 pass
         # Filter out already-downloaded
         new_js -= discovered_imports
+        new_js -= set(read_lines(js_urls_file))
         discovered_imports.update(new_js)
         if not new_js:
             break
         # Download newly discovered JS
+        info(f"Recursive JS depth {depth + 1}: {len(new_js)} new candidate files")
         with concurrent.futures.ThreadPoolExecutor(max_workers=20) as ex:
-            list(ex.map(download_js, list(new_js)[:200]))
+            list(ex.map(download_js, list(new_js)[:500]))
 
     new_downloaded = len(list(files_dir.glob("*.js"))) - downloaded
     if new_downloaded > 0:
@@ -979,17 +1546,31 @@ def phase_js(target, out):
     else:
         ok("Recursive JS crawl: no additional JS imports found")
 
+    if source_by_file:
+        with open(js_dir / "js_file_sources.json", "w") as f:
+            json.dump(source_by_file, f, indent=2)
+
     # Source map detection
     info("Checking for exposed source maps (.js.map)...")
+    explicit_map_urls = set()
+    for jsf in files_dir.glob("*.js"):
+        try:
+            content = jsf.read_text(errors="ignore")
+            explicit_map_urls.update(extract_source_map_refs(content, source_by_file.get(jsf.name)))
+        except Exception:
+            pass
+
+    map_candidates = {url + ".map" for url in read_lines(js_urls_file)[:1000]}
+    map_candidates.update(explicit_map_urls)
     map_found = []
-    def check_map(url):
-        body, code = fetch_url(url + ".map", timeout=10)
+    def check_map(map_url):
+        body, code = fetch_url(map_url, timeout=10)
         if code == 200 and "mappings" in body:
-            return url + ".map"
+            return map_url
         return None
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=20) as ex:
-        results = list(ex.map(check_map, js_urls[:200]))
+        results = list(ex.map(check_map, sorted(map_candidates)[:1500]))
         map_found = [r for r in results if r]
 
     if map_found:
@@ -1024,56 +1605,266 @@ def phase_js(target, out):
         run(f"find {files_dir} -name '*.js' | xargs -P5 -I{{}} jsluice secrets {{}} 2>/dev/null > {secrets_dir}/jsluice_secrets.json")
         ok(f"JSluice endpoints: {count_lines(ep_dir/'jsluice_endpoints.txt')}")
 
-    # Extract all paths from JS
-    info("Extracting API routes from JS files...")
+    # Advanced static analysis over JS and exposed source maps.
+    info("Advanced JS analysis: API calls, routes, GraphQL, storage, sinks, configs...")
     endpoint_patterns = [
-        r'"(/[a-zA-Z0-9_/.-]{2,})"',
-        r"'(/[a-zA-Z0-9_/.-]{2,})'",
-        r'`(/[a-zA-Z0-9_/${}./-]{2,})`',
-        r'"/api/[^"]{2,}"',
-        r"path:\s*['\"]([^'\"]+)['\"]",
+        r'"(/[a-zA-Z0-9_/${}?.=&%:,@+\-./]{2,})"',
+        r"'(/[a-zA-Z0-9_/${}?.=&%:,@+\-./]{2,})'",
+        r'`(/[a-zA-Z0-9_/${}?.=&%:,@+\-./]{2,})`',
+        r"(?:url|uri|endpoint|baseURL|baseUrl|apiUrl|api_url|proxy|target)\s*[:=]\s*['\"]([^'\"]{3,})['\"]",
+        r"fetch\s*\(\s*['\"]([^'\"]{3,})['\"]",
+        r"axios\.(?:get|post|put|patch|delete|request)\s*\(\s*['\"]([^'\"]{3,})['\"]",
+        r"https?://[^\s\"'`<>]+",
     ]
+    ignore_exts = (".png", ".jpg", ".jpeg", ".gif", ".svg", ".css", ".ico", ".woff", ".woff2", ".ttf", ".mp4", ".webp")
+    analysis_blobs = []
     all_endpoints = set()
+    all_absolute_urls = set()
+    api_calls = []
+    graphql_ops = []
+    client_routes = set()
+    storage_keys = set()
+    interesting_config = set()
+    dangerous_sinks = []
+    priority_scores = {}
+
     for jsf in files_dir.glob("*.js"):
         try:
-            content = jsf.read_text(errors="ignore")
-            for pat in endpoint_patterns:
-                for m in re.finditer(pat, content):
-                    ep = m.group(1) if m.lastindex else m.group()
-                    if len(ep) > 3 and not ep.endswith((".png", ".jpg", ".css", ".ico")):
-                        all_endpoints.add(ep.strip("\"'`"))
-        except:
+            analysis_blobs.append((jsf.name, jsf.read_text(errors="ignore"), source_by_file.get(jsf.name, "")))
+        except Exception:
             pass
 
+    source_map_sources = set()
+    source_map_extracted = []
+    source_extract_dir = maps_dir / "sources"
+    if list(maps_dir.glob("*.map")):
+        info("Analyzing exposed source map sources/content...")
+        source_extract_dir.mkdir(exist_ok=True)
+        for map_file in maps_dir.glob("*.map"):
+            try:
+                data = json.loads(map_file.read_text(errors="ignore"))
+                sources = data.get("sources") or []
+                source_root = data.get("sourceRoot") or ""
+                sources_content = data.get("sourcesContent") or []
+                for idx, src in enumerate(sources):
+                    src_name = f"{source_root}{src}" if source_root else src
+                    source_map_sources.add(src_name)
+                    if idx < len(sources_content) and sources_content[idx]:
+                        safe_base = re.sub(r'[^A-Za-z0-9_.-]+', '_', os.path.basename(src) or 'source.txt')[:80]
+                        if not safe_base.lower().endswith((".js", ".mjs", ".jsx", ".ts", ".tsx", ".txt")):
+                            safe_base += ".txt"
+                        out_src = source_extract_dir / f"{hashlib.md5((map_file.name + src).encode()).hexdigest()[:10]}_{safe_base}"
+                        out_src.write_text(sources_content[idx], errors="ignore")
+                        label = f"sourcemap:{map_file.name}:{src_name}"
+                        analysis_blobs.append((label, sources_content[idx], ""))
+                        source_map_extracted.append(f"{src_name}\t{out_src}")
+            except Exception as e:
+                warn(f"Could not parse source map {map_file.name}: {e}")
+        if source_map_sources:
+            (js_dir / "source_map_sources.txt").write_text("\n".join(sorted(source_map_sources)) + "\n")
+            ok(f"Source map source paths: {len(source_map_sources)}")
+        if source_map_extracted:
+            (maps_dir / "source_map_extracted_files.txt").write_text("\n".join(source_map_extracted) + "\n")
+            ok(f"Extracted source map source files: {len(source_map_extracted)}")
+
+    def bump(label, amount=1):
+        priority_scores[label] = priority_scores.get(label, 0) + amount
+
+    def clean_candidate(value):
+        value = (value or "").replace("\\/", "/").replace("\\u002F", "/").replace("\\u002f", "/")
+        value = value.strip().strip('"\'`),;')
+        return value
+
+    def add_endpoint(value, label):
+        value = clean_candidate(value)
+        if len(value) < 3 or value.lower().endswith(ignore_exts):
+            return
+        if value.startswith(("http://", "https://")):
+            all_absolute_urls.add(value)
+        elif value.startswith("/") or any(x in value.lower() for x in ("api/", "graphql", "oauth", "sso", "auth", "admin")):
+            all_endpoints.add(value)
+        if any(kw in value.lower() for kw in ["admin", "internal", "debug", "graphql", "token", "secret", "config", "oauth", "sso", "auth"]):
+            bump(label, 3)
+
+    sink_patterns = [
+        ("DOM HTML sink", r"\b(?:innerHTML|outerHTML|insertAdjacentHTML|document\.write|dangerouslySetInnerHTML)\b"),
+        ("Code execution sink", r"\b(?:eval|Function)\s*\(|set(?:Timeout|Interval)\s*\(\s*['\"`]") ,
+        ("Wildcard postMessage", r"\.postMessage\s*\([^,]+,\s*['\"]\*['\"]"),
+        ("Message listener", r"addEventListener\s*\(\s*['\"]message['\"]"),
+        ("Client redirect sink", r"(?:window\.)?location\.(?:href|assign|replace)\s*[=(]"),
+        ("Prototype pollution keyword", r"(?:__proto__|constructor\.prototype|prototype\[)") ,
+    ]
+
+    for label, content, base_url in analysis_blobs:
+        for pat in endpoint_patterns:
+            for m in re.finditer(pat, content, flags=re.I):
+                add_endpoint(m.group(1) if m.lastindex else m.group(), label)
+
+        for m in re.finditer(r"fetch\s*\(\s*(['\"`])([^'\"`]{3,})\1(?P<tail>.{0,500})", content, flags=re.I | re.S):
+            url = clean_candidate(m.group(2))
+            method_m = re.search(r"method\s*:\s*['\"]([A-Z]+)['\"]", m.group('tail'), flags=re.I)
+            method = method_m.group(1).upper() if method_m else "GET"
+            api_calls.append({"file": label, "method": method, "url": url, "source": base_url})
+            add_endpoint(url, label)
+            bump(label, 1)
+
+        for m in re.finditer(r"axios\.(get|post|put|patch|delete|head|options)\s*\(\s*(['\"`])([^'\"`]{3,})\2", content, flags=re.I):
+            method = m.group(1).upper()
+            url = clean_candidate(m.group(3))
+            api_calls.append({"file": label, "method": method, "url": url, "source": base_url})
+            add_endpoint(url, label)
+            bump(label, 1)
+
+        for m in re.finditer(r"axios\s*\(\s*\{(?P<body>.{0,800}?)\}\s*\)", content, flags=re.I | re.S):
+            body = m.group('body')
+            url_m = re.search(r"url\s*:\s*['\"]([^'\"]{3,})['\"]", body, flags=re.I)
+            method_m = re.search(r"method\s*:\s*['\"]([A-Z]+)['\"]", body, flags=re.I)
+            if url_m:
+                url = clean_candidate(url_m.group(1))
+                method = method_m.group(1).upper() if method_m else "GET"
+                api_calls.append({"file": label, "method": method, "url": url, "source": base_url})
+                add_endpoint(url, label)
+                bump(label, 1)
+
+        for m in re.finditer(r"\b(query|mutation|subscription)\s+([A-Za-z_][A-Za-z0-9_]*)?\s*(?:\([^)]*\))?\s*\{", content):
+            snippet = content[m.start():m.start()+500].replace("\n", " ")
+            graphql_ops.append({"file": label, "type": m.group(1), "name": m.group(2) or "anonymous", "snippet": snippet[:500]})
+            bump(label, 3 if m.group(1) == "mutation" else 2)
+
+        for m in re.finditer(r"(?:gql|graphql)\s*`([^`]{20,1200})`", content, flags=re.I | re.S):
+            snippet = m.group(1).replace("\n", " ")[:500]
+            op_m = re.search(r"\b(query|mutation|subscription)\s+([A-Za-z_][A-Za-z0-9_]*)?", snippet)
+            graphql_ops.append({"file": label, "type": op_m.group(1) if op_m else "graphql", "name": (op_m.group(2) if op_m and op_m.group(2) else "anonymous"), "snippet": snippet})
+            bump(label, 3)
+
+        for pat in [
+            r"<Route[^>]+path=['\"]([^'\"]+)['\"]",
+            r"path\s*:\s*['\"](/[^'\"]*)['\"]",
+            r"router\.(?:push|replace)\s*\(\s*['\"]([^'\"]+)['\"]",
+            r"navigate\s*\(\s*['\"]([^'\"]+)['\"]",
+        ]:
+            for m in re.finditer(pat, content, flags=re.I):
+                route = clean_candidate(m.group(1))
+                if route and not route.lower().endswith(ignore_exts):
+                    client_routes.add(route)
+
+        for m in re.finditer(r"(?:localStorage|sessionStorage)\.(?:getItem|setItem|removeItem)\s*\(\s*['\"]([^'\"]+)['\"]", content):
+            storage_keys.add(f"{m.group(1)}\t{label}")
+            bump(label, 1)
+        if "document.cookie" in content:
+            storage_keys.add(f"document.cookie\t{label}")
+            bump(label, 1)
+
+        for m in re.finditer(r"([A-Za-z0-9_]*(?:api|auth|sso|oauth|client|tenant|realm|issuer|audience|environment|base)[A-Za-z0-9_]*)\s*[:=]\s*['\"]([^'\"]{3,})['\"]", content, flags=re.I):
+            interesting_config.add(f"{m.group(1)} = {m.group(2)}\t{label}")
+            bump(label, 2)
+        for m in re.finditer(r"\b(?:is|has|enable|allow)[A-Z][A-Za-z0-9_]*(?:Admin|Debug|Beta|Internal|Experimental|Feature|Bypass)[A-Za-z0-9_]*\b", content):
+            interesting_config.add(f"feature_flag = {m.group()}\t{label}")
+            bump(label, 1)
+
+        for sink_name, pat in sink_patterns:
+            for m in re.finditer(pat, content, flags=re.I):
+                context = content[max(0, m.start()-80):m.end()+120].replace("\n", " ")[:260]
+                dangerous_sinks.append({"file": label, "type": sink_name, "match": m.group()[:120], "context": context})
+                bump(label, 2 if sink_name in ("Wildcard postMessage", "Code execution sink") else 1)
+
+    def unique_dict_rows(rows, keys):
+        seen = set()
+        unique = []
+        for row in rows:
+            marker = tuple(row.get(k, "") for k in keys)
+            if marker in seen:
+                continue
+            seen.add(marker)
+            unique.append(row)
+        return unique
+
+    api_calls = unique_dict_rows(api_calls, ["method", "url", "file"])
+    graphql_ops = unique_dict_rows(graphql_ops, ["type", "name", "snippet", "file"])
+    dangerous_sinks = unique_dict_rows(dangerous_sinks, ["type", "match", "file", "context"])
+
     if all_endpoints:
-        with open(ep_dir / "js_extracted_endpoints.txt", "w") as f:
-            f.write("\n".join(sorted(all_endpoints)))
-        ok(f"Endpoints extracted from JS: {len(all_endpoints)}")
-        # Flag high-value endpoints
-        for ep in all_endpoints:
-            for kw in ["admin", "internal", "debug", "export", "import", "config", "backup", "token", "secret", "key", "graphql"]:
-                if kw in ep.lower():
-                    hit(f"Interesting endpoint in JS: {ep}")
-                    break
+        (ep_dir / "js_extracted_endpoints.txt").write_text("\n".join(sorted(all_endpoints)) + "\n")
+        ok(f"Endpoints extracted from JS/source maps: {len(all_endpoints)}")
+    if all_absolute_urls:
+        (ep_dir / "js_absolute_urls.txt").write_text("\n".join(sorted(all_absolute_urls)) + "\n")
+        ok(f"Absolute URLs extracted from JS/source maps: {len(all_absolute_urls)}")
+        for url in sorted(all_absolute_urls):
+            if any(kw in url.lower() for kw in ["api", "auth", "admin", "internal", "graphql", "token", "config"]):
+                hit(f"Interesting absolute URL in JS: {url}")
+    if api_calls:
+        with open(js_dir / "js_api_calls.json", "w") as f:
+            json.dump(api_calls, f, indent=2)
+        (ep_dir / "js_api_calls.txt").write_text("\n".join(f"{r['method']} {r['url']} [{r['file']}]" for r in api_calls) + "\n")
+        ok(f"JS API calls cataloged: {len(api_calls)}")
+    if graphql_ops:
+        with open(js_dir / "graphql_operations.json", "w") as f:
+            json.dump(graphql_ops, f, indent=2)
+        (js_dir / "graphql_operations.txt").write_text("\n".join(f"{r['type']} {r['name']} [{r['file']}] {r['snippet']}" for r in graphql_ops) + "\n")
+        hit(f"GraphQL operations found in JS: {len(graphql_ops)}")
+    if client_routes:
+        (js_dir / "client_routes.txt").write_text("\n".join(sorted(client_routes)) + "\n")
+        ok(f"Client-side routes found: {len(client_routes)}")
+    if storage_keys:
+        (js_dir / "storage_keys.txt").write_text("\n".join(sorted(storage_keys)) + "\n")
+        ok(f"Storage/cookie keys found: {len(storage_keys)}")
+    if interesting_config:
+        (js_dir / "interesting_config.txt").write_text("\n".join(sorted(interesting_config)) + "\n")
+        ok(f"Interesting config values found: {len(interesting_config)}")
+    if dangerous_sinks:
+        with open(js_dir / "client_attack_surface.json", "w") as f:
+            json.dump(dangerous_sinks, f, indent=2)
+        (js_dir / "client_attack_surface.txt").write_text("\n".join(f"[{r['type']}] {r['file']} :: {r['context']}" for r in dangerous_sinks[:1000]) + "\n")
+        warn(f"Client-side attack-surface sinks found: {len(dangerous_sinks)}")
+    if priority_scores:
+        ranked = sorted(priority_scores.items(), key=lambda x: x[1], reverse=True)
+        (js_dir / "js_priority_files.txt").write_text("\n".join(f"{score}\t{name}" for name, score in ranked[:200]) + "\n")
+        hit(f"Priority JS files to review: {len(ranked[:200])} -> js/js_priority_files.txt")
 
-    # Secret scanning
-    info(f"Scanning JS files for secrets ({len(SECRET_PATTERNS)} patterns + entropy analysis)...")
-    findings = scan_js_secrets(str(files_dir), secrets_dir)
-    total_secrets = sum(len(v["matches"]) for v in findings.values())
+    for ep in sorted(all_endpoints):
+        for kw in ["admin", "internal", "debug", "export", "import", "config", "backup", "token", "secret", "key", "graphql", "oauth", "sso", "auth"]:
+            if kw in ep.lower():
+                hit(f"Interesting endpoint in JS: {ep}")
+                break
 
-    if total_secrets > 0:
-        hit(f"SECRETS FOUND: {total_secrets} items across {len(findings)} pattern types")
-        for name, data in findings.items():
-            if data["severity"] in ("CRITICAL", "HIGH"):
-                hit(f"  [{data['severity']}] {name}: {len(data['matches'])} occurrences")
+    # Secret scanning — also scan extracted source map sources and config files
+    total_secrets = 0
+    findings = {}
+
+    if AI_CONFIG.get("only"):
+        info("AI-only mode: skipping regex secret scanning")
     else:
-        ok("No secrets found in JS files")
+        extra_scan_dirs = []
+        if maps_dir.exists():
+            sources_dir = maps_dir / "sources"
+            if sources_dir.exists():
+                extra_scan_dirs.append(str(sources_dir))
+        info(f"Scanning JS files for secrets ({len(SECRET_PATTERNS)} patterns + entropy analysis, {len(extra_scan_dirs)} extra dir(s))...")
+        findings = scan_js_secrets(str(files_dir), secrets_dir, extra_dirs=extra_scan_dirs)
+        total_secrets = sum(len(v["matches"]) for v in findings.values())
 
-    # Generate per-file findings report
-    info("Generating per-file JS findings report...")
-    report_path = generate_js_findings_report(str(js_dir), str(secrets_dir), findings)
-    if report_path:
-        hit(f"Per-file findings report: {report_path}")
+        if total_secrets > 0:
+            hit(f"SECRETS FOUND: {total_secrets} items across {len(findings)} pattern types")
+            for name, data in findings.items():
+                if data["severity"] in ("CRITICAL", "HIGH"):
+                    hit(f"  [{data['severity']}] {name}: {len(data['matches'])} occurrences")
+        else:
+            ok("No secrets found in JS files")
+
+        # Generate per-file findings report
+        info("Generating per-file JS findings report...")
+        report_path = generate_js_findings_report(str(js_dir), str(secrets_dir), findings)
+        if report_path:
+            hit(f"Per-file findings report: {report_path}")
+
+    # ── AI-powered secret scan (optional) ──
+    ai_findings = []
+    if AI_CONFIG.get("enabled"):
+        info("AI-powered secret scanning enabled — running LLM analysis on JS files...")
+        ai_findings = ai_scan_js_secrets(str(files_dir), str(maps_dir), str(secrets_dir))
+        if ai_findings:
+            total_secrets += len(ai_findings)
+            hit(f"AI scan found {len(ai_findings)} secret(s)")
 
     return total_secrets, len(map_found)
 
@@ -1946,6 +2737,12 @@ def generate_report(target, out, stats):
 {cat(secrets_dir/'js_findings_per_file.txt', 50)}
 ```
 
+### 🤖 AI-Powered Secret Scan
+> AI-assisted detection — `secrets/js_ai_findings.txt`
+```
+{cat(secrets_dir/'js_ai_findings.txt', 30)}
+```
+
 ### � GraphQL Introspection
 ```
 {cat(gql_dir/'graphql_endpoints.txt')}
@@ -2265,9 +3062,28 @@ Examples:
     parser.add_argument("--output", help="Custom output directory")
     parser.add_argument("--threads", type=int, default=20, help="Thread count for parallel tasks")
     parser.add_argument("--merge", action="store_true", help="With --scope, merge all domains into a single output directory instead of one per domain")
+    # ── AI-powered secret scanning ──
+    parser.add_argument("--ai-secrets", action="store_true", help="Enable AI-powered secret scanning on JS files")
+    parser.add_argument("--ai-secrets-only", action="store_true",
+                        help="Skip regex entirely; use AI exclusively for JS secret detection")
+    parser.add_argument("--ai-provider", choices=["openai", "ollama"], default="openai",
+                        help="AI provider: openai (default, uses OPENAI_API_KEY) or ollama (local, uses OLLAMA_HOST)")
+    parser.add_argument("--ai-model", help="AI model override (e.g. gpt-4o, claude-3-sonnet, llama3)")
+    parser.add_argument("--ai-api-key", help="API key for AI provider (defaults to OPENAI_API_KEY env)")
+    parser.add_argument("--ai-api-base", help="Custom API base URL (e.g. https://api.openai.com/v1 or http://localhost:11434)")
 
     args = parser.parse_args()
     banner()
+
+    # ── AI config: --ai-secrets-only implies --ai-secrets ──
+    global AI_CONFIG
+    if args.ai_secrets_only or args.ai_secrets:
+        AI_CONFIG["enabled"] = True
+        AI_CONFIG["only"] = bool(args.ai_secrets_only)
+        AI_CONFIG["provider"] = args.ai_provider or "openai"
+        AI_CONFIG["model"] = args.ai_model
+        AI_CONFIG["api_key"] = args.ai_api_key
+        AI_CONFIG["api_base"] = args.ai_api_base
 
     if args.check_tools:
         check_tools()

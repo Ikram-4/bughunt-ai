@@ -1,0 +1,4 @@
+http://aspera.mbc.net
+https://aspera.mbc.net
+https://aspera.mbc.net/auth/saml/login
+https://aspera.mbc.net/login

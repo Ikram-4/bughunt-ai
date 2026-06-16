@@ -107,3 +107,57 @@ python3 bughunter.py example.com --phase vulns
 # Full run with auth cookie
 python3 bughunter.py example.com --cookie "auth=eyJhb..."
 ```
+
+---
+
+## AI-Powered JS Secret Scanning
+
+Uses an LLM (OpenAI, Ollama, or any OpenAI-compatible API) to find hardcoded credentials, API keys, tokens, passwords, and other secrets in JavaScript files. Catches what regex misses: obfuscated credentials, split variables, base64-encoded values, and unusual formats.
+
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--ai-secrets` | Run AI scan **after** the regex-based scan (both run) |
+| `--ai-secrets-only` | Skip regex completely; **only** use AI for secret detection |
+| `--ai-provider` | `openai` (default) or `ollama` |
+| `--ai-model` | Override model (e.g. `gpt-4o-mini`, `claude-3-sonnet`, `llama3`) |
+| `--ai-api-key` | API key (defaults to `OPENAI_API_KEY` env var) |
+| `--ai-api-base` | Custom API base URL |
+
+### How It Works
+
+1. Every downloaded JS file plus every extracted source-map source is sent to the LLM
+2. The AI identifies credentials, API keys, tokens, passwords, private keys, connection strings, and any other secret-like values
+3. Results are saved to:
+   - `secrets/js_ai_findings.json` (full JSON with file, type, value, line, confidence)
+   - `secrets/js_ai_findings.txt` (human-readable summary)
+
+### Examples
+
+```bash
+# OpenAI (reads OPENAI_API_KEY from environment)
+python3 bughunter.py example.com --phase js --ai-secrets
+
+# AI only — skip regex, use OpenAI
+python3 bughunter.py example.com --phase js --ai-secrets-only
+
+# AI only with local Ollama (no API key needed)
+python3 bughunter.py example.com --phase js --ai-secrets-only --ai-provider ollama
+
+# Custom model via Ollama
+python3 bughunter.py example.com --phase js --ai-secrets-only --ai-provider ollama --ai-model llama3
+
+# Custom API endpoint (DeepSeek, local proxy, etc.)
+python3 bughunter.py example.com --phase js --ai-secrets --ai-api-base https://api.deepseek.com/v1
+
+# Full recon with AI
+python3 bughunter.py example.com --ai-secrets-only --ai-provider ollama
+```
+
+### Providers
+
+| Provider | API Key | Default Model | Notes |
+|----------|---------|---------------|-------|
+| `openai` | `OPENAI_API_KEY` env or `--ai-api-key` | `gpt-4o-mini` | Works with any OpenAI-compatible API |
+| `ollama` | None (local) | `llama3` | Set `OLLAMA_HOST` env to change from `http://localhost:11434` |
