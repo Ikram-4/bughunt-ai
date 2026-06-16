@@ -112,7 +112,7 @@ python3 bughunter.py example.com --cookie "auth=eyJhb..."
 
 ## AI-Powered JS Secret Scanning
 
-Uses an LLM (OpenAI, Ollama, or any OpenAI-compatible API) to find hardcoded credentials, API keys, tokens, passwords, and other secrets in JavaScript files. Catches what regex misses: obfuscated credentials, split variables, base64-encoded values, and unusual formats.
+Uses an LLM to find hardcoded credentials, API keys, tokens, passwords, and other secrets in JavaScript files. Supports **OpenAI/GPT**, **Anthropic Claude**, **DeepSeek**, **Ollama** (local), or any OpenAI-compatible API. Catches what regex misses: obfuscated credentials, split variables, base64-encoded values, and unusual formats.
 
 ### Flags
 
@@ -120,9 +120,9 @@ Uses an LLM (OpenAI, Ollama, or any OpenAI-compatible API) to find hardcoded cre
 |------|-------------|
 | `--ai-secrets` | Run AI scan **after** the regex-based scan (both run) |
 | `--ai-secrets-only` | Skip regex completely; **only** use AI for secret detection |
-| `--ai-provider` | `openai` (default) or `ollama` |
-| `--ai-model` | Override model (e.g. `gpt-4o-mini`, `claude-3-sonnet`, `llama3`) |
-| `--ai-api-key` | API key (defaults to `OPENAI_API_KEY` env var) |
+| `--ai-provider` | `openai` (default), `claude`, or `ollama` |
+| `--ai-model` | Override model (e.g. `gpt-4o`, `claude-sonnet-4`, `deepseek-chat`, `llama3`) |
+| `--ai-api-key` | API key (defaults to `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or provider-specific env) |
 | `--ai-api-base` | Custom API base URL |
 
 ### How It Works
@@ -136,28 +136,39 @@ Uses an LLM (OpenAI, Ollama, or any OpenAI-compatible API) to find hardcoded cre
 ### Examples
 
 ```bash
-# OpenAI (reads OPENAI_API_KEY from environment)
+# ── OpenAI / GPT ──
+export OPENAI_API_KEY="sk-..."
 python3 bughunter.py example.com --phase js --ai-secrets
 
-# AI only — skip regex, use OpenAI
+# AI only — skip regex
 python3 bughunter.py example.com --phase js --ai-secrets-only
 
-# AI only with local Ollama (no API key needed)
+# ── Anthropic Claude ──
+export ANTHROPIC_API_KEY="sk-ant-..."
+python3 bughunter.py example.com --phase js --ai-secrets --ai-provider claude
+
+# Use a specific Claude model
+python3 bughunter.py example.com --phase js --ai-secrets --ai-provider claude --ai-model claude-sonnet-4-20250514
+
+# ── DeepSeek (OpenAI-compatible via --ai-api-base) ──
+export OPENAI_API_KEY="sk-..."
+python3 bughunter.py example.com --phase js --ai-secrets --ai-api-base https://api.deepseek.com/v1
+
+# ── Ollama (local, no API key needed) ──
 python3 bughunter.py example.com --phase js --ai-secrets-only --ai-provider ollama
 
 # Custom model via Ollama
 python3 bughunter.py example.com --phase js --ai-secrets-only --ai-provider ollama --ai-model llama3
 
-# Custom API endpoint (DeepSeek, local proxy, etc.)
-python3 bughunter.py example.com --phase js --ai-secrets --ai-api-base https://api.deepseek.com/v1
-
-# Full recon with AI
+# ── Full recon with AI ──
 python3 bughunter.py example.com --ai-secrets-only --ai-provider ollama
 ```
 
 ### Providers
 
-| Provider | API Key | Default Model | Notes |
-|----------|---------|---------------|-------|
-| `openai` | `OPENAI_API_KEY` env or `--ai-api-key` | `gpt-4o-mini` | Works with any OpenAI-compatible API |
-| `ollama` | None (local) | `llama3` | Set `OLLAMA_HOST` env to change from `http://localhost:11434` |
+| Provider | `--ai-provider` | API Key | Default Model | Notes |
+|----------|-----------------|---------|---------------|-------|
+| OpenAI / GPT | `openai` | `OPENAI_API_KEY` env or `--ai-api-key` | `gpt-4o-mini` | Works with any OpenAI-compatible API (DeepSeek, local proxies, etc.) |
+| Anthropic Claude | `claude` | `ANTHROPIC_API_KEY` env or `--ai-api-key` | `claude-sonnet-4-20250514` | Uses Anthropic Messages API |
+| DeepSeek | `openai` | `OPENAI_API_KEY` or `--ai-api-key` | — | Set `--ai-api-base https://api.deepseek.com/v1` |
+| Ollama | `ollama` | None (local) | `llama3` | Set `OLLAMA_HOST` env to change from `http://localhost:11434` |

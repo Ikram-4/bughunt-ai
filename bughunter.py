@@ -975,7 +975,8 @@ def scan_js_secrets(js_dir, secrets_dir, extra_dirs=None):
 # and extracted source-map sources using an LLM instead of regex.
 #
 # Supported providers (set via --ai-provider):
-#   openai   – OpenAI-compatible API (env: OPENAI_API_KEY)
+#   openai   – OpenAI-compatible API (env: OPENAI_API_KEY) — works with GPT, DeepSeek, etc.
+#   claude   – Anthropic Claude API (env: ANTHROPIC_API_KEY)
 #   ollama   – local Ollama (default http://localhost:11434, env: OLLAMA_HOST)
 #
 # Returns a list of finding dicts compatible with the per-file report.
@@ -994,6 +995,9 @@ def ai_scan_js_secrets(files_dir, maps_dir, secrets_dir):
 
     if provider == "ollama":
         api_base = api_base.rstrip("/")
+    elif provider == "claude":
+        if not api_base:
+            api_base = "https://api.anthropic.com/v1"
 
     # Gather all scan targets (JS files + extracted source-map sources)
     scan_roots = [Path(files_dir)]
@@ -1080,8 +1084,34 @@ def ai_scan_js_secrets(files_dir, maps_dir, secrets_dir):
                     headers=headers_json,
                     method="POST"
                 )
+            elif provider == "claude":
+                effective_key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
+                effective_model = model or "claude-sonnet-4-20250514"
+                if not effective_key:
+                    warn("ANTHROPIC_API_KEY not set — skipping AI scan")
+                    return []
+                headers = {
+                    "Content-Type": "application/json",
+                    "x-api-key": effective_key,
+                    "anthropic-version": "2023-06-01"
+                }
+                payload = json.dumps({
+                    "model": effective_model,
+                    "max_tokens": 2048,
+                    "temperature": 0.1,
+                    "system": system_prompt,
+                    "messages": [
+                        {"role": "user", "content": user_msg}
+                    ]
+                }).encode()
+                req = urllib.request.Request(
+                    f"{api_base}/messages",
+                    data=payload,
+                    headers=headers,
+                    method="POST"
+                )
             else:
-                # default: OpenAI-compatible
+                # default: OpenAI-compatible (GPT, DeepSeek, etc.)
                 effective_key = api_key or os.environ.get("OPENAI_API_KEY", "")
                 effective_model = model or "gpt-4o-mini"
                 if not effective_key:
@@ -1113,6 +1143,11 @@ def ai_scan_js_secrets(files_dir, maps_dir, secrets_dir):
 
             if provider == "ollama":
                 content = data.get("message", {}).get("content", "")
+            elif provider == "claude":
+                content = ""
+                for block in data.get("content", []):
+                    if block.get("type") == "text":
+                        content += block.get("text", "")
             else:
                 content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
 
@@ -3066,11 +3101,11 @@ Examples:
     parser.add_argument("--ai-secrets", action="store_true", help="Enable AI-powered secret scanning on JS files")
     parser.add_argument("--ai-secrets-only", action="store_true",
                         help="Skip regex entirely; use AI exclusively for JS secret detection")
-    parser.add_argument("--ai-provider", choices=["openai", "ollama"], default="openai",
-                        help="AI provider: openai (default, uses OPENAI_API_KEY) or ollama (local, uses OLLAMA_HOST)")
-    parser.add_argument("--ai-model", help="AI model override (e.g. gpt-4o, claude-3-sonnet, llama3)")
-    parser.add_argument("--ai-api-key", help="API key for AI provider (defaults to OPENAI_API_KEY env)")
-    parser.add_argument("--ai-api-base", help="Custom API base URL (e.g. https://api.openai.com/v1 or http://localhost:11434)")
+    parser.add_argument("--ai-provider", choices=["openai", "claude", "ollama"], default="openai",
+                        help="AI provider: openai (OpenAI/GPT/deepseek/any OpenAI-compat), claude (Anthropic Claude), or ollama (local)")
+    parser.add_argument("--ai-model", help="AI model override (e.g. gpt-4o, claude-sonnet-4, deepseek-chat, llama3)")
+    parser.add_argument("--ai-api-key", help="API key (defaults to OPENAI_API_KEY, ANTHROPIC_API_KEY, or provider-specific env)")
+    parser.add_argument("--ai-api-base", help="Custom API base URL (e.g. https://api.openai.com/v1, https://api.anthropic.com/v1, http://localhost:11434)")
 
     args = parser.parse_args()
     banner()
