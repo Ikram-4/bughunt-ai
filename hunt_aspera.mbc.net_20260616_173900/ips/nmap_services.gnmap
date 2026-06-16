@@ -1,2 +1,0 @@
-# Nmap 7.94SVN scan initiated Tue Jun 16 17:42:21 2026 as: nmap -sV -sC -p 9200,6379,27017,5601,8080,8443,4848,7001 -iL hunt_aspera.mbc.net_20260616_173900/ips/all_ips.txt -oA hunt_aspera.mbc.net_20260616_173900/ips/nmap_services --open
-# Nmap done at Tue Jun 16 17:42:29 2026 -- 1 IP address (1 host up) scanned in 7.26 seconds
