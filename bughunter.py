@@ -14,6 +14,9 @@ import concurrent.futures
 from datetime import datetime
 from pathlib import Path
 
+SUPPORTED_OS_NOTE = "BugHunter Pro requires Linux or WSL. Native Windows shells are not supported."
+DOMAIN_RE = re.compile(r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
+
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 if hasattr(sys.stderr, "reconfigure"):
@@ -49,6 +52,16 @@ def warn(msg): print(f"{Y}[!]{NC} {msg}")
 def hit(msg):  print(f"{P}{BOLD}[★ HIT]{NC} {msg}")
 def err(msg):  print(f"{R}[✗]{NC} {msg}")
 def die(msg):  print(f"{R}[FATAL]{NC} {msg}"); sys.exit(1)
+
+def shell_quote(value):
+    return shlex.quote(str(value))
+
+def path_quote(path):
+    return shell_quote(str(path))
+
+def require_supported_runtime():
+    if os.name == "nt":
+        die(SUPPORTED_OS_NOTE + " Run it from WSL/Kali/Ubuntu with python3.")
 
 def run(cmd, timeout=300, capture=True):
     """Run a shell command, return (stdout, returncode)."""
@@ -94,21 +107,42 @@ def check_tool(name):
 
 def count_lines(path):
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8", errors="ignore") as f:
             return sum(1 for l in f if l.strip())
-    except:
+    except FileNotFoundError:
+        return 0
+    except Exception as e:
+        warn(f"Error reading {path}: {e}")
         return 0
 
 def append_file(path, content):
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a") as f:
         f.write(content + "\n")
 
 def read_lines(path):
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8", errors="ignore") as f:
             return [l.strip() for l in f if l.strip()]
-    except:
+    except FileNotFoundError:
         return []
+    except Exception as e:
+        warn(f"Error reading {path}: {e}")
+        return []
+
+def write_text_file(path, content):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8", errors="ignore")
+
+def merge_text_files(files, dest, line_filter=None):
+    lines = set()
+    for src in files:
+        for line in read_lines(src):
+            if line_filter is None or line_filter(line):
+                lines.add(line)
+    write_text_file(dest, "\n".join(sorted(lines)) + ("\n" if lines else ""))
+    return len(lines)
 
 def fetch_url(url, timeout=10, headers=None):
     """Simple HTTP GET, returns (body, status_code)."""
@@ -194,8 +228,8 @@ def phase_passive_subs(target, out):
                     name = name.strip().lstrip("*.")
                     if name.endswith(target):
                         names.add(name)
-            with open(subs_dir / "crt.txt", "w") as f:
-                f.write("\n".join(sorted(names)))
+            if names:
+                write_text_file(subs_dir / "crt.txt", "\n".join(sorted(names)) + "\n")
             ok(f"crt.sh: {len(names)} subdomains")
     except Exception as e:
         warn(f"crt.sh failed: {e}")
@@ -219,8 +253,11 @@ def phase_passive_subs(target, out):
 
     # Merge all
     info("Merging and deduplicating...")
-    run(f"cat {subs_dir}/*.txt 2>/dev/null | grep -E '^[a-zA-Z0-9._-]+$' | grep -E '\\.{re.escape(target)}$|^{re.escape(target)}$' | sort -u > {subs_dir}/all_passive.txt")
-    total = count_lines(subs_dir / "all_passive.txt")
+    total = merge_text_files(
+        subs_dir.glob("*.txt"),
+        subs_dir / "all_passive.txt",
+        lambda line: bool(re.fullmatch(r"[a-zA-Z0-9._-]+", line)) and (line == target or line.endswith(f".{target}")),
+    )
     ok(f"Total passive unique subdomains: {total}")
     return total
 
@@ -239,10 +276,11 @@ def phase_dns(target, out):
     try:
         body, _ = fetch_url("https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt")
         if body:
-            resolvers.write_text(body)
+            write_text_file(resolvers, body)
             ok(f"Resolvers: {count_lines(resolvers)}")
-    except:
-        resolvers.write_text("8.8.8.8\n1.1.1.1\n9.9.9.9\n8.8.4.4\n")
+    except Exception as e:
+        warn(f"Resolver download failed: {e}")
+        write_text_file(resolvers, "8.8.8.8\n1.1.1.1\n9.9.9.9\n8.8.4.4\n")
 
     # puredns bruteforce
     if check_tool("puredns"):
@@ -255,7 +293,7 @@ def phase_dns(target, out):
             warn(f"Wordlist not found: {wordlist} — install SecLists")
 
     # Combine all subs for permutations
-    run(f"cat {subs_dir}/*.txt 2>/dev/null | sort -u > {subs_dir}/combined.txt")
+    merge_text_files(subs_dir.glob("*.txt"), subs_dir / "combined.txt")
 
     # altdns permutations
     if check_tool("altdns"):
@@ -272,7 +310,9 @@ def phase_dns(target, out):
 
     # Resolve everything
     info("Resolving all candidates with puredns...")
-    run(f"cat {subs_dir}/combined.txt {subs_dir}/altdns_perms.txt 2>/dev/null | sort -u | puredns resolve -r {resolvers} -o {dns_dir}/resolved.txt 2>/dev/null || dnsx -l {subs_dir}/combined.txt -silent -o {dns_dir}/resolved.txt", timeout=600)
+    resolve_input = subs_dir / "resolve_candidates.txt"
+    merge_text_files([subs_dir / "combined.txt", subs_dir / "altdns_perms.txt"], resolve_input)
+    run(f"puredns resolve {path_quote(resolve_input)} -r {path_quote(resolvers)} -o {path_quote(dns_dir/'resolved.txt')} 2>/dev/null || dnsx -l {path_quote(subs_dir/'combined.txt')} -silent -o {path_quote(dns_dir/'resolved.txt')}", timeout=600)
     ok(f"Resolved: {count_lines(dns_dir/'resolved.txt')} live subdomains")
 
     # Detailed DNS records
@@ -352,7 +392,7 @@ def phase_http(target, out):
         info("WAF detection on live hosts...")
         urls = read_lines(web_dir / "live_urls.txt")[:20]
         for url in urls:
-            run(f"wafw00f {url} -o {web_dir}/waf_{hashlib.md5(url.encode()).hexdigest()[:8]}.txt 2>/dev/null &")
+            run(f"wafw00f {shell_quote(url)} -o {path_quote(web_dir / ('waf_' + hashlib.md5(url.encode()).hexdigest()[:8] + '.txt'))} 2>/dev/null &")
 
     live = count_lines(web_dir / "live_urls.txt")
     ok(f"Live URLs: {live}")
@@ -454,7 +494,7 @@ def phase_content(target, out, session_cookie=None):
     web_dir = out / "web"
     ep_dir.mkdir(exist_ok=True)
 
-    cookie_flag = f"-H 'Cookie: {session_cookie}'" if session_cookie else ""
+    cookie_header = shell_quote(f"Cookie: {session_cookie}") if session_cookie else ""
     live_urls = read_lines(web_dir / "live_urls.txt")
 
     # Fallback targets when no live hosts were discovered
@@ -467,14 +507,14 @@ def phase_content(target, out, session_cookie=None):
     if check_tool("katana"):
         info("katana JS-aware crawl (unauthenticated)...")
         for url in crawl_targets:
-            run(f"katana -u '{url}' -jc -d 5 -aff -ef css,png,svg,ico,woff,woff2,ttf -silent >> {ep_dir}/katana_unauth.txt", timeout=180)
+            run(f"katana -u {shell_quote(url)} -jc -d 5 -aff -ef css,png,svg,ico,woff,woff2,ttf -silent >> {path_quote(ep_dir/'katana_unauth.txt')}", timeout=180)
         run(f"sort -u {ep_dir}/katana_unauth.txt -o {ep_dir}/katana_unauth.txt")
         ok(f"katana unauth: {count_lines(ep_dir/'katana_unauth.txt')} URLs")
 
         if session_cookie:
             info("katana authenticated crawl...")
             for url in crawl_targets:
-                run(f"katana -u '{url}' -jc -d 5 -H 'Cookie: {session_cookie}' -silent >> {ep_dir}/katana_auth.txt", timeout=180)
+                run(f"katana -u {shell_quote(url)} -jc -d 5 -H {cookie_header} -silent >> {path_quote(ep_dir/'katana_auth.txt')}", timeout=180)
             ok(f"katana auth: {count_lines(ep_dir/'katana_auth.txt')} URLs")
 
     # gau + waybackurls
@@ -491,7 +531,7 @@ def phase_content(target, out, session_cookie=None):
     if check_tool("hakrawler"):
         info("hakrawler...")
         for url in crawl_targets[:10]:
-            run(f"echo '{url}' | hakrawler -d 3 -js -subs 2>/dev/null >> {ep_dir}/hakrawler.txt", timeout=60)
+            run(f"printf '%s\\n' {shell_quote(url)} | hakrawler -d 3 -js -subs 2>/dev/null >> {path_quote(ep_dir/'hakrawler.txt')}", timeout=60)
 
     # feroxbuster directory fuzzing
     if check_tool("feroxbuster"):
@@ -500,7 +540,7 @@ def phase_content(target, out, session_cookie=None):
             info(f"feroxbuster dir fuzzing on top 3 targets...")
             for url in crawl_targets[:3]:
                 safe = hashlib.md5(url.encode()).hexdigest()[:8]
-                run(f"feroxbuster -u '{url}' -w {wordlist} -x php,asp,aspx,jsp,json,txt,bak,old,zip,env,config -r -s 200,301,302,403 -q --no-state -o {ep_dir}/ferox_{safe}.txt", timeout=300)
+                run(f"feroxbuster -u {shell_quote(url)} -w {path_quote(wordlist)} -x php,asp,aspx,jsp,json,txt,bak,old,zip,env,config -r -s 200,301,302,403 -q --no-state -o {path_quote(ep_dir / ('ferox_' + safe + '.txt'))}", timeout=300)
             ok("feroxbuster complete")
 
     # kiterunner API routes
@@ -510,7 +550,7 @@ def phase_content(target, out, session_cookie=None):
             info("kiterunner API route discovery...")
             for url in crawl_targets[:10]:
                 safe = hashlib.md5(url.encode()).hexdigest()[:8]
-                run(f"kr scan '{url}' -w {kite} -o {ep_dir}/kr_{safe}.txt", timeout=120)
+                run(f"kr scan {shell_quote(url)} -w {path_quote(kite)} -o {path_quote(ep_dir / ('kr_' + safe + '.txt'))}", timeout=120)
 
     # ── Sensitive file / path probing ──
     info("Probing for exposed sensitive files on live hosts...")
@@ -621,7 +661,7 @@ def phase_params(target, out):
         live_urls = read_lines(out / "web" / "live_urls.txt")
         for url in live_urls[:15]:
             safe = hashlib.md5(url.encode()).hexdigest()[:8]
-            run(f"arjun -u '{url}' -m GET -oJ {params_dir}/arjun_{safe}.json -q", timeout=60)
+            run(f"arjun -u {shell_quote(url)} -m GET -oJ {path_quote(params_dir / ('arjun_' + safe + '.json'))} -q", timeout=60)
         ok("arjun complete")
 
     ok(f"Parameter discovery done")
@@ -1503,14 +1543,15 @@ def phase_js(target, out):
                 checked_manifests.append(f"{manifest_url} -> {len(refs)} JS refs")
                 collected_js.update(refs)
     if checked_manifests:
-        (js_dir / "js_manifests_checked.txt").write_text("\n".join(checked_manifests) + "\n")
+        write_text_file(js_dir / "js_manifests_checked.txt", "\n".join(checked_manifests) + "\n")
         ok(f"Framework manifests added JS refs: {len(checked_manifests)} manifest(s)")
 
     if check_tool("getJS"):
         for url in live_urls[:20]:
-            run(f"getJS --url '{url}' --complete --nocolors 2>/dev/null >> {js_urls_file}")
+            run(f"getJS --url {shell_quote(url)} --complete --nocolors 2>/dev/null >> {path_quote(js_urls_file)}")
 
-    with open(js_urls_file, "a") as f:
+    js_urls_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(js_urls_file, "a", encoding="utf-8", errors="ignore") as f:
         for url in sorted(collected_js):
             f.write(url + "\n")
 
@@ -1532,18 +1573,18 @@ def phase_js(target, out):
                 return out_path.name
             body, code = fetch_url(url, timeout=15)
             if code in (200, 401, 403) and body and ("javascript" in body[:500].lower() or len(body) > 200):
-                out_path.write_text(body, errors="ignore")
+                write_text_file(out_path, body)
                 source_by_file[out_path.name] = url
                 return out_path.name
-        except:
-            pass
+        except Exception as e:
+            warn(f"Failed to download JS {url}: {e}")
         return None
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=20) as ex:
-        list(ex.map(download_js, js_urls[:3000]))
+        results = list(ex.map(download_js, js_urls[:3000]))
 
-    downloaded = len(list(files_dir.glob("*.js")))
-    ok(f"Downloaded: {downloaded} JS files")
+    downloaded_files = [r for r in results if r is not None]
+    ok(f"Downloaded: {len(downloaded_files)} JS files")
 
     # ── Recursive JS Crawling — discover JS imports/chunks inside JS ──
     info("Recursive JS crawling (depth 3) — finding imports/chunks inside JS files...")
@@ -1557,8 +1598,8 @@ def phase_js(target, out):
                 if not base_url and js_urls:
                     base_url = js_urls[0]
                 new_js.update(extract_js_refs(content, base_url))
-            except:
-                pass
+            except Exception as e:
+                warn(f"Error reading JS file {jsf}: {e}")
         # Filter out already-downloaded
         new_js -= discovered_imports
         new_js -= set(read_lines(js_urls_file))
@@ -2490,7 +2531,7 @@ def phase_vulns(target, out):
         inj_urls = read_lines(out / "params" / "injection_prone.txt")[:10]
         for url in inj_urls:
             safe = hashlib.md5(url.encode()).hexdigest()[:8]
-            run(f"sqlmap -u '{url}' --batch --level=1 --risk=1 --smart --random-agent --output-dir={vulns_dir}/sqlmap_{safe} 2>/dev/null", timeout=120)
+            run(f"sqlmap -u {shell_quote(url)} --batch --level=1 --risk=1 --smart --random-agent --output-dir={path_quote(vulns_dir / ('sqlmap_' + safe))} 2>/dev/null", timeout=120)
         ok("sqlmap scan complete — check vulns/sqlmap_* directories")
     else:
         info("Install sqlmap for automated SQL injection testing: apt install sqlmap")
@@ -2672,13 +2713,13 @@ def generate_report(target, out, stats):
         except:
             return "None found"
 
-    report = f"""# 🎯 BugHunter Pro Report — {target}
+    report = f"""# BugHunter Pro Report - {target}
 **Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 **Output:** {out}/
 
 ---
 
-## 📊 Recon Statistics
+## Recon Statistics
 
 | Phase | Count |
 |-------|-------|
@@ -2694,153 +2735,153 @@ def generate_report(target, out, stats):
 
 ---
 
-## 🔥 HIGH PRIORITY FINDINGS
+## High Priority Review Queue
 
-### 🔴 Exposed Admin Panels
+### Review: Exposed Admin Panels
 ```
 {cat(vulns_dir/'nuclei_panels.txt')}
 ```
 
-### 🔴 Default Credentials
+### Review: Default Credentials
 ```
 {cat(vulns_dir/'nuclei_default_creds.txt')}
 ```
 
-### 🔴 High/Critical CVEs
+### Review: High/Critical CVEs
 ```
 {cat(vulns_dir/'nuclei_cve.txt')}
 ```
 
-### 🟠 Source Maps (Unminified Source Code Exposed)
+### Review: Source Maps (Unminified Source Code Exposed)
 ```
 {cat(js_dir/'source_maps_found.txt')}
 ```
 
-### 🟠 Subdomain Takeovers
+### Review: Subdomain Takeovers
 ```
 {cat(vulns_dir/'subzy_results.txt')}
 ```
 
-### 🟠 CORS Misconfigurations
+### Review: CORS Misconfigurations
 ```
 {cat(vulns_dir/'nuclei_cors.txt')}
 ```
 
-### 🔴 CORS Standalone Testing
+### Review: CORS Standalone Testing
 ```
 {cat(vulns_dir/'cors_misconfig.txt')}
 ```
 
-### 🔴 CNAME Takeover Candidates
+### Review: CNAME Takeover Candidates
 ```
 {cat(vulns_dir/'cname_takeovers.txt')}
 ```
 
-### 🔴 Sensitive Files Exposed
+### Review: Sensitive Files Exposed
 ```
 {cat(vulns_dir/'sensitive_files.txt')}
 ```
 
-### 🔴 CRLF Injection
+### Review: CRLF Injection
 ```
 {cat(vulns_dir/'crlf_injection.txt')}
 ```
 
-### 🔴 Open Redirects Confirmed
+### Review: Open Redirect Candidates
 ```
 {cat(vulns_dir/'open_redirects.txt')}
 ```
 
-### 🟠 Host Header Injection
+### Review: Host Header Injection
 ```
 {cat(vulns_dir/'host_header_injection.txt')}
 ```
 
-### 🔴 Dalfox XSS Findings
+### Review: Dalfox XSS Findings
 ```
 {cat(vulns_dir/'dalfox_xss.txt', 20)}
 ```
 
-### 🟠 Secrets in JavaScript
+### Review: Secrets in JavaScript
 ```
 {cat(secrets_dir/'js_api_key_generic.json', 10)}
 ```
 
-### 🔴 JS Findings Per-File Report
+### Review: JS Findings Per-File Report
 > Full per-file breakdown: `secrets/js_findings_per_file.txt`
 ```
 {cat(secrets_dir/'js_findings_per_file.txt', 50)}
 ```
 
-### 🤖 AI-Powered Secret Scan
-> AI-assisted detection — `secrets/js_ai_findings.txt`
+### Review: AI-Powered Secret Scan
+> AI-assisted detection - `secrets/js_ai_findings.txt`
 ```
 {cat(secrets_dir/'js_ai_findings.txt', 30)}
 ```
 
-### � GraphQL Introspection
+### Review: GraphQL Introspection
 ```
 {cat(gql_dir/'graphql_endpoints.txt')}
 ```
 
-### 🔴 GraphQL Schema Types
+### Review: GraphQL Schema Types
 ```
 {cat(gql_dir/'schema_types.txt', 20)}
 ```
 
-### 🟠 API Endpoints Discovered
+### Review: API Endpoints Discovered
 ```
 {cat(api_dir/'found_api_paths.txt', 20)}
 ```
 
-### 🟠 HTTP Method Fuzzing Hits
+### Review: HTTP Method Fuzzing Hits
 ```
 {cat(api_dir/'method_allowed.txt')}
 ```
 
-### �🟡 SSRF-Prone Parameters
+### Review: SSRF-Prone Parameters
 ```
 {cat(params_dir/'ssrf_prone.txt', 20)}
 ```
 
-### 🟡 Open Redirect Parameters
+### Review: Open Redirect Parameters
 ```
 {cat(params_dir/'redirect_prone.txt', 20)}
 ```
 
-### 🟡 XSS-Prone Parameters
+### Review: XSS-Prone Parameters
 ```
 {cat(params_dir/'xss_prone.txt', 20)}
 ```
 
-### 🟡 IDOR-Prone Parameters
+### Review: IDOR-Prone Parameters
 ```
 {cat(params_dir/'idor_prone.txt', 20)}
 ```
 
-### 🟡 403 Bypass Successes
+### Review: 403 Bypass Successes
 ```
 {cat(vulns_dir/'403_bypasses.txt')}
 ```
 
-### 🟡 Exposed Files
+### Review: Exposed Files
 ```
 {cat(vulns_dir/'nuclei_exposure.txt')}
 ```
 
-### 🔵 Token/Secret Exposures
+### Review: Token/Secret Exposures
 ```
 {cat(vulns_dir/'nuclei_tokens.txt')}
 ```
 
-### 🔵 Misconfigurations
+### Review: Misconfigurations
 ```
 {cat(vulns_dir/'nuclei_misconfig.txt')}
 ```
 
 ---
 
-## 📁 Output File Map
+## Output File Map
 
 ```
 {out}/
@@ -2954,7 +2995,7 @@ def generate_report(target, out, stats):
 """
 
     report_path = out / f"HUNT_REPORT_{target}.md"
-    report_path.write_text(report)
+    report_path.write_text(report, encoding="utf-8")
     ok(f"Report saved: {report_path}")
     return report_path
 
@@ -2969,6 +3010,9 @@ def clean_domain(raw):
     line = line.split("/")[0]     # take only host
     line = line.split(":")[0]     # strip port
     line = line.lstrip("*.")
+    line = line.strip(".")
+    if not DOMAIN_RE.fullmatch(line):
+        return ""
     return line
 
 
@@ -3109,6 +3153,9 @@ Examples:
 
     args = parser.parse_args()
     banner()
+
+    if os.name == "nt" and not args.install:
+        require_supported_runtime()
 
     # ── AI config: --ai-secrets-only implies --ai-secrets ──
     global AI_CONFIG
