@@ -24,7 +24,7 @@ This Code of Conduct applies in all project spaces — GitHub issues, PRs, discu
 
 ## Enforcement
 
-Violations can be reported to [shuvonsec@gmail.com](mailto:shuvonsec@gmail.com). All reports are reviewed confidentially. Maintainers may remove, edit, or reject contributions that violate this Code of Conduct.
+Violations can be reported to [shaikikram2005@gmail.com](mailto:shaikikram2005@gmail.com). All reports are reviewed confidentially. Maintainers may remove, edit, or reject contributions that violate this Code of Conduct.
 
 ---
 

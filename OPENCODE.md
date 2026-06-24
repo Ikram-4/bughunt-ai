@@ -19,7 +19,7 @@ You also need [OpenCode](https://opencode.ai) installed.
 ### Install
 
 ```bash
-git clone https://github.com/shuvonsec/claude-bug-bounty.git
+git clone https://github.com/Ikram-4/bughunt-ai.git
 cd claude-bug-bounty
 chmod +x install_tools.sh && ./install_tools.sh   # scanning tools
 chmod +x install.sh && ./install.sh --opencode    # skills + commands

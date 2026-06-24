@@ -104,15 +104,12 @@ def print_banner(subtitle: Optional[str] = None, target: Optional[str] = None,
     grad, cyan, magenta, bold, dim, nc = _palette(stream)
 
     print(file=stream)
-    for color, row in zip(grad, _LOGO):
-        print(f"  {color}{row}{nc}", file=stream)
 
     if subtitle:
         bar = "─" * _LOGO_WIDTH
         print(f"  {cyan}{bar}{nc}", file=stream)
         print(f"  {cyan}{_center(subtitle, _LOGO_WIDTH)}{nc}", file=stream)
 
-    print(f"  {dim}{_center(_TAG, _LOGO_WIDTH)}{nc}", file=stream)
     if target:
         line = f"▸ target: {target}"
         print(f"  {magenta}{_center(line, _LOGO_WIDTH)}{nc}", file=stream)

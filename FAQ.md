@@ -198,7 +198,7 @@ chmod +x install.sh && ./install.sh   # reinstall skills + commands
 
 **Where do I report bugs or ask for help?**
 
-Open an issue on [GitHub](https://github.com/shuvonsec/claude-bug-bounty/issues). Include:
+Open an issue on [GitHub](https://github.com/Ikram-4/bughunt-ai/issues). Include:
 - What command you ran
 - What you expected to happen
 - What actually happened

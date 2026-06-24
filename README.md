@@ -820,7 +820,7 @@ bughunter-pro/
 ## Credits
 
 - **BugHunter Pro v4.0** — 13-phase pipeline, 70+ JS secret patterns, entropy analysis, JS deep recon, all scanning phases
-- **Claude Bug Bounty** (shuvonsec) — Modular architecture, multi-AI provider system, ReAct agent, validation gate, Web3 modules, memory system, MCP integrations, tests
+- **Claude Bug Bounty** — Modular architecture, multi-AI provider system, ReAct agent, validation gate, Web3 modules, memory system, MCP integrations, tests
 
 ---
 

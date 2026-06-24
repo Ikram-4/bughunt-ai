@@ -26,4 +26,4 @@ Read in order from `00-START-HERE.md`. Each file ends with `→ NEXT`.
 
 ---
 
-Also available as a standalone repo: [web3-bug-bounty-hunting-ai-skills](https://github.com/shuvonsec/web3-bug-bounty-hunting-ai-skills)
+Also available as a standalone repo: [web3-bug-bounty-hunting-ai-skills](https://github.com/Ikram-4/bughunt-ai)

@@ -59,12 +59,6 @@ print_banner() {
     fi
 
     echo
-    printf '  %s██████╗ ██╗   ██╗ ██████╗ ██╗  ██╗██╗   ██╗███╗   ██╗████████╗███████╗██████╗ %s\n' "$C1" "$NC"
-    printf '  %s██╔══██╗██║   ██║██╔════╝ ██║  ██║██║   ██║████╗  ██║╚══██╔══╝██╔════╝██╔══██╗%s\n' "$C2" "$NC"
-    printf '  %s██████╔╝██║   ██║██║  ███╗███████║██║   ██║██╔██╗ ██║   ██║   █████╗  ██████╔╝%s\n' "$C3" "$NC"
-    printf '  %s██╔══██╗██║   ██║██║   ██║██╔══██║██║   ██║██║╚██╗██║   ██║   ██╔══╝  ██╔══██╗%s\n' "$C4" "$NC"
-    printf '  %s██████╔╝╚██████╔╝╚██████╔╝██║  ██║╚██████╔╝██║ ╚████║   ██║   ███████╗██║  ██║%s\n' "$C5" "$NC"
-    printf '  %s╚═════╝  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝   ╚═╝   ╚══════╝╚═╝  ╚═╝%s\n' "$C6" "$NC"
 
     if [ -n "$subtitle" ]; then
         local bar=''
@@ -72,7 +66,6 @@ print_banner() {
         printf '  %s%s%s\n' "$CYAN" "$bar" "$NC"
         printf '  %s%s%s\n' "$CYAN" "$(_bb_center "$subtitle" $_BB_LOGO_WIDTH)" "$NC"
     fi
-    printf '  %s%s%s\n' "$DIM" "$(_bb_center 'bughunter' $_BB_LOGO_WIDTH)" "$NC"
     if [ -n "$target" ]; then
         printf '  %s%s%s\n' "$MAGENTA" "$(_bb_center "▸ target: $target" $_BB_LOGO_WIDTH)" "$NC"
     fi

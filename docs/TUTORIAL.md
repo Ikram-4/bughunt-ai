@@ -32,7 +32,7 @@ scanner available and skips the rest gracefully.
 ## A. Install (30 sec)
 
 ```bash
-git clone https://github.com/shuvonsec/claude-bug-bounty.git
+git clone https://github.com/Ikram-4/bughunt-ai.git
 cd claude-bug-bounty
 chmod +x install.sh && ./install.sh
 ```

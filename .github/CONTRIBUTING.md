@@ -58,4 +58,4 @@ chore: maintenance (deps, CI, cleanup)
 
 ## Questions?
 
-Open a [GitHub Discussion](https://github.com/shuvonsec/claude-bug-bounty/discussions) or reach out at [shuvonsec@gmail.com](mailto:shuvonsec@gmail.com).
+Open a [GitHub Discussion](https://github.com/shuvonsec/claude-bug-bounty/discussions) or reach out at [shaikikram2005@gmail.com](mailto:shaikikram2005@gmail.com).
