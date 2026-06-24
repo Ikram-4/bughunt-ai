@@ -156,6 +156,23 @@ class Brain:
     def __init__(self, provider=None):
         self.client = LLMClient(provider)
         self.provider = self.client.provider
+        self._skill_context = ""
+        self._load_skill()
+
+    def _load_skill(self):
+        skill_path = Path(__file__).resolve().parent / "SKILL.md"
+        if skill_path.exists():
+            try:
+                text = skill_path.read_text(encoding="utf-8", errors="ignore")
+                if text.startswith("---"):
+                    end = text.find("---", 3)
+                    if end != -1:
+                        text = text[end + 3:].lstrip()
+                self._skill_context = text[:4000]
+            except: pass
+
+    def _recon_system(self):
+        return self._skill_context + "\n\n" + self.SYSTEM if self._skill_context else self.SYSTEM
 
     def analyze_recon(self, recon_dir):
         """Analyze recon data and suggest attack vectors."""
@@ -167,7 +184,7 @@ class Brain:
 
 Data:
 {json.dumps(data, indent=2)[:8000]}"""
-        return self.client.chat(system=self.SYSTEM, user=prompt, timeout=600)
+        return self.client.chat(system=self._recon_system(), user=prompt, timeout=600)
 
     def analyze_js(self, js_content, filename=""):
         """Analyze a JavaScript file for hardcoded secrets (batch-style)."""
@@ -231,7 +248,7 @@ Provide:
 2. Impact assessment (critical/high/medium/low/info)
 3. Steps to verify
 4. Remediation advice"""
-        return self.client.chat(system=self.SYSTEM, user=prompt)
+        return self.client.chat(system=self._recon_system(), user=prompt)
 
     def triage_finding(self, finding_text):
         """Fast triage: pass/kill/downgrade with reason."""
@@ -240,7 +257,7 @@ Provide:
 
 Respond with: PASS (high chance of payout) | KILL (not exploitable) | DOWNGRADE
 Include 1-2 sentence reason."""
-        return self.client.chat(system=self.SYSTEM, user=prompt, max_tokens=200)
+        return self.client.chat(system=self._recon_system(), user=prompt, max_tokens=200)
 
     def build_chain(self, findings_dir):
         """Build exploit chain from multiple findings."""
@@ -254,11 +271,11 @@ Include 1-2 sentence reason."""
 {data[:6000] if data else 'No structured findings available.'}
 
 Show the step-by-step exploitation path from least to most impactful."""
-        return self.client.chat(system=self.SYSTEM, user=prompt)
+        return self.client.chat(system=self._recon_system(), user=prompt)
 
     def chat(self, message):
         """Free-form Q&A."""
-        return self.client.chat(system=self.SYSTEM, user=message)
+        return self.client.chat(system=self._recon_system(), user=message)
 
     def _gather_recon_data(self, recon_dir):
         data = {}
